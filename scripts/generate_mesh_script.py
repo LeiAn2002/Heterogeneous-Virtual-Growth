@@ -24,15 +24,18 @@ from homogenization.generate_fem_mesh_2d import generate_fem_mesh_2d
 from homogenization.generate_fem_mesh_3d import generate_fem_mesh_3d
 
 
-dim = 3
+dim = 2
 match dim:
     case 2:
-        d, m, n = 0.20, 0.75, 0.25
+        d, m, n = 0.5, 0.75, 0.25
         block_size = 2 * m
         data_path = "virtual_growth_data/2d/"
         symbolic_graph = np.load("designs/2d/symbolic_graph.npy")
-        generate_fem_mesh_2d(symbolic_graph, block_size, data_path,
-                             mesh_path="designs/2d/", check_with_pyvista=True)
+        all_elems = np.load("virtual_growth_data/2d/all_elems.npy")
+        v_array = np.array([0.4])
+        generate_fem_mesh_2d(symbolic_graph, block_size, data_path, all_elems,
+                             v_array, mesh_path="designs/2d/",
+                             check_with_pyvista=True)
     case 3:
         m, n = 1.2, 0.0
         block_size = 2 * m

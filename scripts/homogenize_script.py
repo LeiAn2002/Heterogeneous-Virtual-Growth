@@ -24,7 +24,7 @@ from homogenization.homogenization_2d import homogenized_elasticity_matrix_2d
 from homogenization.homogenization_3d import homogenized_elasticity_matrix_3d
 
 
-dim = 3
+dim = 2
 match dim:
     case 2:
         mesh = np.load("designs/2d/fem_mesh.npz")
