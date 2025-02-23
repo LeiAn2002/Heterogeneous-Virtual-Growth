@@ -21,16 +21,22 @@ Citations:
 
 from virtual_growth.pair_rules_2d import pair_rules_2d
 from virtual_growth.pair_rules_3d import pair_rules_3d
+import numpy as np
 
+v_array = np.array([0.2, 0.3, 0.6, 0.9])
 
-dim = 3
+dim = 2
 match dim:
     case 2:
         block_names = ["corner", "cross", "line", "skew", "t", "v", "x"]
-        pair_rules_2d(block_names, d=0.20, m=0.75, n=0.25, num_elems_d=3, num_elems_m=5,
+        # pair_rules_2d(block_names, d=0.5, m=0.75, n=0.25, num_elems_d=3, num_elems_m=5,
+        #               path_name="virtual_growth_data/2d/")
+
+        pair_rules_2d(block_names, v_array, m=0.75, num_elems_d=3, num_elems_m=5,
                       path_name="virtual_growth_data/2d/")
+
     case 3:
         block_names = ["corner", "cross_line", "line", "plane_corner",
                        "cross", "plane_cross", "t", "t_line"]
-        pair_rules_3d(block_names, d=0.2, m=1.2, n=0.0, num_elems_m=3,
+        pair_rules_3d(block_names, d=0.2, m=1.2, n=0.1, num_elems_m=3,
                       path_name="virtual_growth_data/3d/")

@@ -148,30 +148,35 @@ def generate_special_rules(blocks, names):
     return special_rules
 
 
-def pair_rules_2d(block_names: list, d=1, m=6, n=0, num_elems_d=4, num_elems_m=10,
+def pair_rules_2d(block_names: list, v_array: np.ndarray, m=6, num_elems_d=4, num_elems_m=10,
                   path_name=""):
     """Generate rules for virtual growth."""
-    all_unique_blocks, all_unique_block_nodes = [], []
+    # all_unique_blocks, all_unique_block_nodes = [], []
+    all_unique_blocks = []
     all_block_names, all_extended_block_names = [], []
-    all_unique_block_fem_nodes = []
-    all_unique_block_fem_elements, all_unique_block_cell_types = [], []
-    block_elem_dict = block_library_elem(d, m, n)
+    # all_unique_block_fem_nodes = []
+    # all_unique_block_fem_elements, all_unique_block_cell_types = [], []
+    block_elem_dict = block_library_elem(m, 1)   # library这里应该需要修改
 
     for block_name in block_names:
         input_block = block_library[block_name]  # Pixel representation
         inp_block_nodes = block_elem_dict[block_name]["nodes"]
         inp_block_fem_elements, inp_block_fem_cell_types, inp_block_fem_nodes = \
-            block_mesher(block_name, d, m, n, num_elems_d, num_elems_m)
-        out_blocks, out_block_nodes, out_block_fem_nodes = rotate_block(
+            block_mesher(block_name, m, 1, num_elems_d, num_elems_m)    # related to mesh generate
+        # out_blocks, out_block_nodes, out_block_fem_nodes = rotate_block(
+        #     input_block, inp_block_nodes, inp_block_fem_nodes)  # Block variations
+
+        out_blocks, _, _ = rotate_block(
             input_block, inp_block_nodes, inp_block_fem_nodes)  # Block variations
+        
         unique_indices = remove_repeated_blocks(out_blocks)  # Unique variations
 
         for count, i in enumerate(unique_indices):
             all_unique_blocks.append(out_blocks[i])
-            all_unique_block_nodes.append(out_block_nodes[i])
-            all_unique_block_fem_nodes.append(out_block_fem_nodes[i])
-            all_unique_block_fem_elements.append(inp_block_fem_elements)
-            all_unique_block_cell_types.append(inp_block_fem_cell_types)
+            # all_unique_block_nodes.append(out_block_nodes[i])
+            # all_unique_block_fem_nodes.append(out_block_fem_nodes[i])
+            # all_unique_block_fem_elements.append(inp_block_fem_elements)
+            # all_unique_block_cell_types.append(inp_block_fem_cell_types)
             all_block_names.append(block_name)
             all_extended_block_names.append(block_name+f" {count}")
 
@@ -212,29 +217,68 @@ def pair_rules_2d(block_names: list, d=1, m=6, n=0, num_elems_d=4, num_elems_m=1
     with open(path_name+"rotation_table.pkl", "wb") as f:
         pickle.dump(rotation_table, f)
 
-    # Save the unique block nodes
-    all_unique_block_nodes = np.array(all_unique_block_nodes, dtype=object)
-    np.save(path_name+"unique_block_nodes.npy",
-            all_unique_block_nodes)
-
-    # Save the unique block fem nodes
-    all_unique_block_fem_nodes = np.array(all_unique_block_fem_nodes, dtype=object)
-    np.save(path_name+"unique_block_fem_nodes.npy",
-            all_unique_block_fem_nodes)
-
-    # Save the unique block fem elements
-    all_unique_block_fem_elements = np.array(all_unique_block_fem_elements, dtype=object)
-    np.save(path_name+"unique_block_fem_elements.npy",
-            all_unique_block_fem_elements)
-
-    # Save the unique block fem cell_types
-    all_unique_block_cell_types = np.array(all_unique_block_cell_types, dtype=object)
-    np.save(path_name+"unique_block_fem_cell_types.npy",
-            all_unique_block_cell_types)
-
     # Save the special rules
     with open(path_name+"special_rules.pkl", "wb") as f:
         pickle.dump(special_rules, f)
 
     encode(all_extended_block_names, rotation_table, rules, special_rules,
            path_name=path_name)
+
+    unique_v_vals = np.unique(v_array)
+
+    for v_val in unique_v_vals:
+        subdir = os.path.join(path_name, str(v_val))
+        if not os.path.exists(subdir):
+            os.makedirs(subdir)
+        
+        all_v_block_nodes = []
+        all_v_fem_nodes = []
+        all_v_fem_elements = []
+        all_v_fem_cell_types = []
+
+        block_elem_dict_v = block_library_elem(m, v_val)
+
+        idx = 0
+        for block_name in block_names:
+            input_block = block_library[block_name]
+            inp_block_nodes = block_elem_dict_v[block_name]["nodes"]
+            inp_block_fem_elements, inp_block_fem_cell_types, inp_block_fem_nodes = \
+                block_mesher(block_name, m, v_val, num_elems_d, num_elems_m)
+            out_blocks, out_block_nodes, out_block_fem_nodes = rotate_block(
+                input_block, inp_block_nodes, inp_block_fem_nodes
+            )
+            local_unique_indices = remove_repeated_blocks(out_blocks)
+            for count, i_idx in enumerate(local_unique_indices):
+                all_v_block_nodes.append(out_block_nodes[i_idx])
+                all_v_fem_nodes.append(out_block_fem_nodes[i_idx])
+                all_v_fem_elements.append(inp_block_fem_elements)
+                all_v_fem_cell_types.append(inp_block_fem_cell_types)
+            idx += len(local_unique_indices)
+            np.save(os.path.join(subdir, "unique_block_nodes.npy"),
+                np.array(all_v_block_nodes, dtype=object))
+            np.save(os.path.join(subdir, "unique_block_fem_nodes.npy"),
+                np.array(all_v_fem_nodes, dtype=object))
+            np.save(os.path.join(subdir, "unique_block_fem_elements.npy"),
+                np.array(all_v_fem_elements, dtype=object))
+            np.save(os.path.join(subdir, "unique_block_fem_cell_types.npy"),
+                np.array(all_v_fem_cell_types, dtype=object))
+
+    # # Save the unique block nodes
+    # all_unique_block_nodes = np.array(all_unique_block_nodes, dtype=object)
+    # np.save(path_name+"unique_block_nodes.npy",
+    #         all_unique_block_nodes)
+
+    # # Save the unique block fem nodes
+    # all_unique_block_fem_nodes = np.array(all_unique_block_fem_nodes, dtype=object)
+    # np.save(path_name+"unique_block_fem_nodes.npy",
+    #         all_unique_block_fem_nodes)
+
+    # # Save the unique block fem elements
+    # all_unique_block_fem_elements = np.array(all_unique_block_fem_elements, dtype=object)
+    # np.save(path_name+"unique_block_fem_elements.npy",
+    #         all_unique_block_fem_elements)
+
+    # # Save the unique block fem cell_types
+    # all_unique_block_cell_types = np.array(all_unique_block_cell_types, dtype=object)
+    # np.save(path_name+"unique_block_fem_cell_types.npy",
+    #         all_unique_block_cell_types)

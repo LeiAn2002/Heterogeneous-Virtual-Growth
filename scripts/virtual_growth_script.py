@@ -21,22 +21,46 @@ Citations:
 
 import numpy as np
 from virtual_growth.main import main
+from virtual_growth.pair_rules_2d import pair_rules_2d
+from virtual_growth.pair_rules_3d import pair_rules_3d
 
 
-dim = 3
+# v = volume fracttion
+# d = 0.75*v   n = 0.75-d
+
+dim = 2
 match dim:
     case 2:
-        mesh_size = (2, 3)
-        element_size = (2, 2)
-        candidates = ["cross", "t"]
+        mesh_size = (2, 2)
+        element_size = (1, 1)
+        candidates = ["o"]
         num_elems = np.prod(mesh_size)
         frequency_hints = np.random.rand(num_elems, len(candidates))
         frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
-        d, m, n = 0.20, 0.75, 0.25
+        v_array = np.array([0.4, 0.2, 0.6, 0.9])
+
+        # first_row_v = np.linspace(0.25, 0.75, 6)
+        # v_array = np.tile(first_row_v, (6, 1))
+        # v_array = v_array.flatten()
+
+        # first_row_fre = np.linspace(1, 0, 6)
+        # base_matrix = np.tile(first_row_fre, (6, 1))
+        # base_matrix = base_matrix.T
+        # flattened = base_matrix.flatten()
+        # second_third_row = (1 - flattened) / 2
+        # frequency_hints = np.vstack([flattened, second_third_row, second_third_row])
+        # frequency_hints = frequency_hints.T
+
+        # d, m, n = 0.5, 0.75, 0.25
+        m = 0.75
         data_path = "virtual_growth_data/2d/"
         save_path = "designs/2d/"
         fig_name = "symbolic_graph.jpg"
         gif_name = "symbolic_graph.gif"
+        block_names = ["o", "x"]
+        pair_rules_2d(block_names, v_array, m=0.75, num_elems_d=3, num_elems_m=5,
+                      path_name="virtual_growth_data/2d/")
+
     case 3:
         mesh_size = (1, 1, 1)
         element_size = (3, 3, 3)
@@ -52,7 +76,7 @@ match dim:
 
 if __name__ == "__main__":
     main(mesh_size, element_size, candidates, frequency_hints,
-         d, m, n, num_tries=10, print_frequency=True, make_figure=True,
-         make_gif=True, data_path=data_path, save_path=save_path,
+         v_array, m, num_tries=40, print_frequency=True, make_figure=True,
+         make_gif=False, data_path=data_path, save_path=save_path,
          fig_name=fig_name, gif_name=gif_name, save_mesh=True,
          save_mesh_path=save_path, periodic=True)

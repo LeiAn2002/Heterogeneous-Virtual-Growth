@@ -42,9 +42,13 @@ def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
     return frequency
 
 
-def plot_microstructure_2d(full_mesh, block_lib, block_nodes, names,
-                           block_size, solid=[], void=[], color="#96ADFC",
+def plot_microstructure_2d(full_mesh, all_elems, block_lib, v_data_map, names,
+                           block_size, v_array, solid=[], void=[], color="#96ADFC",
                            save_path="", fig_name="microstructure.jpg"):
+    rows, cols = full_mesh.shape
+    cell_nodes = [[None for _ in range(cols)] for _ in range(rows)]
+    cell_elems = [[None for _ in range(cols)] for _ in range(rows)]
+
     node_count = 0
     k = 0
     element_count = np.zeros(full_mesh.size, dtype=int)
@@ -57,17 +61,106 @@ def plot_microstructure_2d(full_mesh, block_lib, block_nodes, names,
             index = names.tolist().index(block)
 
             elements = block_lib[parent]["elements"].copy()
-            elements[:, 1:] += node_count
-            nodes = block_nodes[index].copy()
+            # elements[:, 1:] += node_count
+
+            elem_id = all_elems[k]
+            v_val = v_array[elem_id]
+
+            block_nodes_v = v_data_map[v_val]["block_nodes"]
+
+            nodes = block_nodes_v[index].copy()
 
             nodes[:, 0] += block_size * x
             nodes[:, 1] -= block_size * y  # Note here it should minus
-            node_count += nodes.shape[0]
+            # node_count += nodes.shape[0]
 
-            element_list.extend(elements.tolist())
-            node_list.extend(nodes.tolist())
+            # element_list.extend(elements.tolist())
+            # node_list.extend(nodes.tolist())
 
-            element_count[k] = elements.shape[0]
+            # element_count[k] = elements.shape[0]
+
+            cell_nodes[y][x] = nodes
+            cell_elems[y][x] = elements
+
+            k += 1
+
+    for y in range(rows):
+        for x in range(cols):
+            elem_id = all_elems[y*cols+x]
+            v_val_self = v_array[elem_id]
+            nodes_self = cell_nodes[y][x]
+
+            # check the left and right neighbor
+            if x+1 < cols and cell_nodes[y][x+1] is not None:
+                elem_id_neighbor = all_elems[y*cols+(x+1)]
+                v_val_neig = v_array[elem_id_neighbor]
+                if v_val_self != v_val_neig:
+                    nodes_neig = cell_nodes[y][x+1]
+                    thresh = 1e-6
+                    self_right = np.argwhere(
+                        np.isclose(nodes_self[:, 0], (x+0.5)*block_size, atol=thresh)
+                    ).flatten()
+                    neig_left = np.argwhere(
+                        np.isclose(nodes_neig[:, 0], (x+0.5)*block_size, atol=thresh)
+                    ).flatten()
+
+                    self_right_sorted = self_right[np.argsort(nodes_self[self_right, 1])]
+                    neig_left_sorted = neig_left[np.argsort(nodes_neig[neig_left, 1])]
+
+                    n_match = min(self_right_sorted.size, neig_left_sorted.size)
+
+                    for i in range(n_match):
+                        i_s = self_right_sorted[i]
+                        i_n = neig_left_sorted[i]
+                        avg_x = 0.5*(nodes_self[i_s, 0] + nodes_neig[i_n, 0])
+                        avg_y = 0.5*(nodes_self[i_s, 1] + nodes_neig[i_n, 1])
+
+                        nodes_self[i_s, 0] = avg_x
+                        nodes_self[i_s, 1] = avg_y
+                        nodes_neig[i_n, 0] = avg_x
+                        nodes_neig[i_n, 1] = avg_y
+
+            # check the bottom and top neighbor
+            if y+1 < rows and cell_nodes[y+1][x] is not None:
+                elem_id_neighbor = all_elems[(y+1)*cols + x]
+                v_val_neig = v_array[elem_id_neighbor]
+                if v_val_self != v_val_neig:
+                    nodes_neig = cell_nodes[y+1][x]
+
+                    thresh = 1e-6
+                    self_bottom = np.argwhere(
+                        np.isclose(nodes_self[:, 1], -(y+0.5)*block_size, atol=thresh)
+                    ).flatten()
+                    neig_top = np.argwhere(
+                        np.isclose(nodes_neig[:, 1], -(y+0.5)*block_size, atol=thresh)
+                    ).flatten()
+
+                    self_bottom_sorted = self_bottom[np.argsort(nodes_self[self_bottom, 0])]
+                    neig_top_sorted = neig_top[np.argsort(nodes_neig[neig_top, 0])]
+
+                    n_match = min(self_bottom_sorted.size, neig_top_sorted.size)
+                    for i in range(n_match):
+                        i_s = self_bottom_sorted[i]
+                        i_n = neig_top_sorted[i]
+                        avg_x = 0.5*(nodes_self[i_s, 0] + nodes_neig[i_n, 0])
+                        avg_y = 0.5*(nodes_self[i_s, 1] + nodes_neig[i_n, 1])
+                        nodes_self[i_s, 0] = avg_x
+                        nodes_self[i_s, 1] = avg_y
+                        nodes_neig[i_n, 0] = avg_x
+                        nodes_neig[i_n, 1] = avg_y
+
+    k = 0
+    for y in range(rows):
+        for x in range(cols):
+            local_nodes = cell_nodes[y][x]
+            local_elems = cell_elems[y][x].copy()
+            local_elems[:, 1:] += node_count
+            
+            node_list.extend(local_nodes.tolist())
+            element_list.extend(local_elems.tolist())
+
+            element_count[k] = local_elems.shape[0]
+            node_count += local_nodes.shape[0]
             k += 1
 
     elements = np.array(element_list)

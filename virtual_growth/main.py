@@ -24,6 +24,7 @@ import time
 import datetime
 import pytz
 from tqdm import tqdm
+import sys
 
 import numpy as np
 
@@ -36,7 +37,7 @@ from utils.array_list_operations import find_indices
 
 
 def main(mesh_size, elem_size, candidates, frequency_hints,
-         d=1, m=6, n=0, periodic=False, num_tries=1, print_frequency=True,
+         v_array: np.ndarray, m=6, periodic=True, num_tries=1, print_frequency=True,
          make_figure=True, make_gif=True, color="#96ADFC", data_path="",
          save_path="", fig_name="microstructure.jpg",
          gif_name="microstructure.mp4", save_mesh=False, save_mesh_path="",
@@ -130,6 +131,9 @@ def main(mesh_size, elem_size, candidates, frequency_hints,
         x_elem, _ = np.divmod(x_cell, elem_size[2])
         all_elems = z_elem*mesh_size[1]*mesh_size[2] + y_elem*mesh_size[2] + x_elem
 
+    all_elems_path = os.path.join(data_path, 'all_elems.npy')
+    np.save(all_elems_path, all_elems)
+
     # Import data
     names = np.load(data_path + "unique_names.npy")
     rules = np.load(data_path + "pair_rules_encoded.npy")
@@ -213,6 +217,7 @@ def main(mesh_size, elem_size, candidates, frequency_hints,
                     right_blocks = aug_full_mesh[1:-1, 2:].flatten()
                     top_blocks = aug_full_mesh[:-2, 1:-1].flatten()
                     bottom_blocks = aug_full_mesh[2:, 1:-1].flatten()
+
                 elif dim == 3:
                     left_blocks = aug_full_mesh[1:-1, 1:-1, :-2].flatten()
                     right_blocks = aug_full_mesh[1:-1, 1:-1, 2:].flatten()
@@ -350,21 +355,45 @@ def main(mesh_size, elem_size, candidates, frequency_hints,
 
     # Plot generated microstructures
     if make_figure:
-        block_nodes = np.load(data_path + "unique_block_nodes.npy",
-                              allow_pickle=True)
+        # block_nodes = np.load(data_path + "unique_block_nodes.npy",
+        #                       allow_pickle=True)
+
+        unique_v_vals = np.unique(v_array)
+
+        v_data_map = {}
+        
+        for v_val in unique_v_vals:
+            names_file = os.path.join(data_path, "unique_names.npy")
+            nodes_file = os.path.join(data_path, f"{v_val}", "unique_block_nodes.npy")
+
+            if (not os.path.exists(names_file)) or (not os.path.exists(nodes_file)):
+                raise FileNotFoundError(
+                    f"Data files for v={v_val} not found. Expecting:\n"
+                    f"  {names_file}\n  {nodes_file}"
+                )
+            names_v = np.load(names_file, allow_pickle=True)
+            block_nodes_v = np.load(nodes_file, allow_pickle=True)
+
+            v_data_map[v_val] = {
+                "names": names_v,
+                "block_nodes": block_nodes_v
+            }
+
+        print(names)
+
         if dim == 2:
             from virtual_growth.block_library_2d import block_library_elem
-            block_lib = block_library_elem(d, m, n)
+            block_lib = block_library_elem(m, 1)
             block_size = 2 * m
             elements, cell_types, nodes, element_count = plot_microstructure_2d(
-                full_mesh, block_lib, block_nodes, names, block_size,
-                color=color, save_path=save_path, fig_name=fig_name)
+                full_mesh, all_elems, block_lib, v_data_map, names, block_size,
+                v_array, color=color, save_path=save_path, fig_name=fig_name)
         elif dim == 3:
             from virtual_growth.block_library_3d import block_library_elem
             block_lib = block_library_elem(d, m)
             block_size = 2 * m
             elements, cell_types, nodes, element_count = plot_microstructure_3d(
-                full_mesh, block_lib, block_nodes, names, block_size,
+                full_mesh, block_lib, v, names, block_size,
                 color=color, save_path=save_path, fig_name=fig_name)
 
     if make_gif:
