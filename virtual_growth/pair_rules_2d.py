@@ -204,9 +204,11 @@ class PairRules2D:
                 special_rules["1-1"].append(name)
         return special_rules
 
+    @staticmethod
     def _encode(names, rotation_table, inp_rules, special_rules):
         """Encode strings to numbers."""
         # Encode the rotation table
+        names = np.array(names)
         num_rows = len(rotation_table.keys())
         num_cols = find_max_length_nested_list(rotation_table.values())
         encoded_rotation_table = np.zeros((num_rows, num_cols), dtype=int)

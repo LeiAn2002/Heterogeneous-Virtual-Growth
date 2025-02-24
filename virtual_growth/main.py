@@ -19,8 +19,9 @@ Citations:
   https://doi.org/10.1016/j.cma.2024.116864
 """
 
-from blocks.blocks import CircleBlock2D, BlockLibrary
+from blocks.blocks import BlockLibrary
 from virtual_growth.virual_growth_engine import VirtualGrowthEngine
+import numpy as np
 
 
 def main(
@@ -28,8 +29,7 @@ def main(
         elem_size,
         candidates,
         frequency_hints,
-        v_array,
-        block_names=["circle"],
+        v_array: np.ndarray,
         m=6,
         periodic=True,
         num_tries=1,
@@ -52,8 +52,7 @@ def main(
     engine = VirtualGrowthEngine(library)
 
     # 3) Generate pair rules
-    block_names = ["circle"]
-    engine.generate_pair_rules(block_names)
+    engine.generate_pair_rules(candidates)
 
     # 4) Run the virtual growth
     engine.run_growth(
@@ -63,15 +62,15 @@ def main(
         frequency_hints,
         v_array,
         m,
-        periodic,
-        num_tries,
-        print_frequency,
-        make_figure,
-        make_gif,
-        color,
-        save_path,
-        fig_name,
-        gif_name,
-        save_mesh, save_mesh_path,
-        save_mesh_name
+        periodic=periodic,
+        num_tries=num_tries,
+        print_frequency=print_frequency,
+        make_figure=make_figure,
+        make_gif=make_gif,
+        color=color,
+        save_path=save_path,
+        fig_name=fig_name,
+        gif_name=gif_name,
+        save_mesh=save_mesh, save_mesh_path=save_mesh_path,
+        save_mesh_name=save_mesh_name
     )

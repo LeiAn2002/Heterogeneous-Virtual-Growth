@@ -47,7 +47,7 @@ class CircleBlock2D(Block):
 
     type_name = "circle"
 
-    def __init__(self, m=0.75, v=0.5, rotation=0, discre_number=5):
+    def __init__(self, m=0.75, v=0.5, rotation=0, discre_number=10):
         self.m = m
         self.v = v
         self.rotation = rotation
