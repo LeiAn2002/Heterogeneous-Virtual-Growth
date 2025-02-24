@@ -181,6 +181,8 @@ class VirtualGrowthEngine:
         # Post-processing
         self._post_process(
             self,
+            m,
+            v_array,
             full_mesh,
             block_count,
             aug_candidates,
@@ -369,6 +371,8 @@ class VirtualGrowthEngine:
 
     def _post_process(
         self,
+        m,
+        v_array,
         full_mesh,
         block_count,
         aug_candidates,
@@ -417,7 +421,8 @@ class VirtualGrowthEngine:
         # If you want to produce figures or GIF, call plot functions
         if make_figure:
             # Example 2D call:
-            elements, cell_types, nodes, element_count = plot_microstructure_2d()  # 需要修改！！！！！
+            elements, cell_types, nodes, element_count = plot_microstructure_2d(
+                m, full_mesh, self.all_elems, self.block_library, v_array, color, save_path, fig_name)
 
         if make_gif:
             plot_microstructure_gif()  # 需要修改！！！！！

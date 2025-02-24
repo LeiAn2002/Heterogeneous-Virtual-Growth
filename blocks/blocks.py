@@ -4,6 +4,20 @@ from utils.nodes_operations import arc_points, rotate_nodes
 from utils.create_rectangle_mesh import create_rectangle_mesh
 from utils.mesh_operations import process_raw_mesh, coord_transformation
 
+ALL_BLOCKS = {}
+
+
+def register_block_class(cls):
+    """
+    A decorator that reads cls.type_name and registers
+    cls into a global dictionary ALL_BLOCK_CLASSES.
+    """
+    if not hasattr(cls, "type_name"):
+        raise ValueError("Block class must define a 'type_name' attribute.")
+    name = cls.type_name
+    ALL_BLOCKS[name] = cls
+    return cls
+
 
 class Block(ABC):
 
@@ -28,9 +42,15 @@ class Block(ABC):
         pass
 
 
+@register_block_class
 class CircleBlock2D(Block):
 
-    def __init__(self, discre_number=10):
+    type_name = "circle"
+
+    def __init__(self, m, v, rotation, discre_number=5):
+        self.m = m
+        self.v = v
+        self.rotation = rotation
         self.discre_number = discre_number
 
     def get_adjacent_matrix(self, **kwargs):
@@ -45,41 +65,41 @@ class CircleBlock2D(Block):
         ]).astype(int),
         return adj_matrix
 
-    def get_thickness(self, m, v, rotation, **kwargs):
-        thickness = m * v
+    def get_thickness(self, **kwargs):
+        thickness = self.m * self.v
         thickness_matrix = np.array([
             [thickness, thickness],
             [thickness, thickness]
         ])  # thickness of 4 edges, order: left, bottom, right, top
-        rotated_thickness_matrix = np.roll(thickness_matrix, rotation)
+        rotated_thickness_matrix = np.roll(thickness_matrix, self.rotation)
         return rotated_thickness_matrix
 
-    def generate_nodes(self, m, thickness_matrix, v, rotation, **kwargs):
-        scale = 1 - v
-        t = np.roll(thickness_matrix, -rotation)  # original thickness_matrix
+    def generate_nodes(self, thickness_matrix, **kwargs):
+        scale = 1 - self.v
+        t = np.roll(thickness_matrix, -self.rotation)  # original thickness_matrix
         outside_nodes = np.array([
-            [-m, -t[0, 0], 0],
-            [-t[0, 1], -m, 0],
-            [t[0, 1], -m, 0],
-            [m, -t[1, 0], 0],
-            [m, t[1, 0], 0],
-            [t[1, 1], m, 0],
-            [-t[1, 1], m, 0],
-            [-m, t[0, 0], 0]
+            [-self.m, -t[0, 0], 0],
+            [-t[0, 1], -self.m, 0],
+            [t[0, 1], -self.m, 0],
+            [self.m, -t[1, 0], 0],
+            [self.m, t[1, 0], 0],
+            [t[1, 1], self.m, 0],
+            [-t[1, 1], self.m, 0],
+            [-self.m, t[0, 0], 0]
         ])
         inside_nodes = np.array([
-            [-m*scale, -t[0, 0]*scale, 0],
-            [-t[0, 1]*scale, -m*scale, 0],
-            [t[0, 1]*scale, -m*scale, 0],
-            [m*scale, -t[1, 0]*scale, 0],
-            [m*scale, t[1, 0]*scale, 0],
-            [t[1, 1]*scale, m*scale, 0],
-            [-t[1, 1]*scale, m*scale, 0],
-            [-m*scale, t[0, 0]*scale, 0]
+            [-self.m*scale, -t[0, 0]*scale, 0],
+            [-t[0, 1]*scale, -self.m*scale, 0],
+            [t[0, 1]*scale, -self.m*scale, 0],
+            [self.m*scale, -t[1, 0]*scale, 0],
+            [self.m*scale, t[1, 0]*scale, 0],
+            [t[1, 1]*scale, self.m*scale, 0],
+            [-t[1, 1]*scale, self.m*scale, 0],
+            [-self.m*scale, t[0, 0]*scale, 0]
         ])
 
-        rotated_outside_nodes = rotate_nodes(outside_nodes, rotation)
-        rotated_inside_nodes = rotate_nodes(inside_nodes, rotation)
+        rotated_outside_nodes = rotate_nodes(outside_nodes, self.rotation)
+        rotated_inside_nodes = rotate_nodes(inside_nodes, self.rotation)
 
         nodes_list = []
 
@@ -99,10 +119,10 @@ class CircleBlock2D(Block):
         )
         return elements
 
-    def generate_mesh(self, m, thickness_matrix, v, rotation, num_elems_d, **kwargs):
+    def generate_mesh(self, thickness_matrix, num_elems_d, **kwargs):
         all_nodes = []
         all_elements = []
-        point_sets = self.generate_nodes(m, thickness_matrix, v, rotation)
+        point_sets = self.generate_nodes(self.m, thickness_matrix, self.v, self.rotation)
         # part 1
         for i in range(self.discre_number-1):
             nodes, elements = create_rectangle_mesh(2, 2, num_elems_d, 1)
@@ -193,8 +213,15 @@ class BlockLibrary:
     def __init__(self):
         self._registry = {}
 
-    def register_block(self, block_type_name, block_class):
-        self._registry[block_type_name] = block_class
+    def register_block(self, block_type_name: str):
+        """
+        Takes a string name (like 'circle') and looks up the corresponding
+        block class from the global ALL_BLOCK_CLASSES dictionary.
+        """
+        block_cls = ALL_BLOCKS.get(block_type_name)
+        if block_cls is None:
+            raise ValueError(f"No block class found for {block_type_name}")
+        self._registry[block_type_name] = block_cls
 
     def create_block(self, block_type_name, *args, **kwargs) -> Block:
         cls = self._registry.get(block_type_name)

@@ -42,46 +42,61 @@ def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
     return frequency
 
 
-def plot_microstructure_2d(full_mesh, all_elems, block_lib, v_data_map, names,
-                           block_size, v_array, solid=[], void=[], color="#96ADFC",
+def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
+                           v_array, solid=[], void=[], color="#96ADFC",
                            save_path="", fig_name="microstructure.jpg"):
+    block_size = 2 * m
     rows, cols = full_mesh.shape
     cell_nodes = [[None for _ in range(cols)] for _ in range(rows)]
     cell_elems = [[None for _ in range(cols)] for _ in range(rows)]
 
     node_count = 0
-    k = 0
     element_count = np.zeros(full_mesh.size, dtype=int)
     element_list, node_list = [], []
+    k = 0
+    thickness_matrices = np.zeros((full_mesh.shape[0], full_mesh.shape[1], 2, 2))
 
+    # get the initial thickness matrices
     for y in range(full_mesh.shape[0]):
         for x in range(full_mesh.shape[1]):
             block = full_mesh[y][x]
             parent = block[:block.index(" ")]
-            index = names.tolist().index(block)
-
-            elements = block_lib[parent]["elements"].copy()
-            # elements[:, 1:] += node_count
-
+            suffix_str = block[block.index(" ") + 1:]
+            rotation = int(suffix_str)
             elem_id = all_elems[k]
             v_val = v_array[elem_id]
+            block_class = block_library.create_block(parent, m, v_val, rotation)
+            thickness_matrices[y, x] = block_class.get_thickness_matrix()
+            k += 1
 
-            block_nodes_v = v_data_map[v_val]["block_nodes"]
+    # get the connectivity-ganranteeing thickness matrices
+    for y in range(full_mesh.shape[0]):
+        for x in range(full_mesh.shape[1]):
+            if x < full_mesh.shape[1] - 1:
+                avg = (thickness_matrices[y, x, 1, 0] + thickness_matrices[y, x + 1, 0, 0]) / 2
+                thickness_matrices[y, x, 0, 1] = avg
+                thickness_matrices[y, x + 1, 0, 0] = avg
+            if y < full_mesh.shape[0] - 1:
+                avg = (thickness_matrices[y, x, 0, 1] + thickness_matrices[y + 1, x, 1, 1]) / 2
+                thickness_matrices[y, x, 1, 0] = avg
+                thickness_matrices[y + 1, x, 1, 1] = avg
 
-            nodes = block_nodes_v[index].copy()
-
+    k = 0
+    for y in range(full_mesh.shape[0]):
+        for x in range(full_mesh.shape[1]):
+            block = full_mesh[y][x]
+            parent = block[:block.index(" ")]
+            suffix_str = block[block.index(" ") + 1:]
+            rotation = int(suffix_str)
+            elem_id = all_elems[k]
+            v_val = v_array[elem_id]
+            block_class = block_library.create_block(parent, m, v_val, rotation)
+            elements = block_class.generate_elements().copy()
+            nodes = block_class.generate_nodes(thickness_matrices[y, x]).copy()
             nodes[:, 0] += block_size * x
             nodes[:, 1] -= block_size * y  # Note here it should minus
-            # node_count += nodes.shape[0]
-
-            # element_list.extend(elements.tolist())
-            # node_list.extend(nodes.tolist())
-
-            # element_count[k] = elements.shape[0]
-
             cell_nodes[y][x] = nodes
             cell_elems[y][x] = elements
-
             k += 1
 
     k = 0
@@ -90,7 +105,6 @@ def plot_microstructure_2d(full_mesh, all_elems, block_lib, v_data_map, names,
             local_nodes = cell_nodes[y][x]
             local_elems = cell_elems[y][x].copy()
             local_elems[:, 1:] += node_count
-            
             node_list.extend(local_nodes.tolist())
             element_list.extend(local_elems.tolist())
 

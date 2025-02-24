@@ -29,6 +29,7 @@ def main(
         candidates,
         frequency_hints,
         v_array,
+        block_names=["circle"],
         m=6,
         periodic=True,
         num_tries=1,
@@ -52,7 +53,7 @@ def main(
 
     # 3) Generate pair rules
     block_names = ["circle"]
-    engine.generate_pair_rules(block_names, v_array=v_array, m=m)
+    engine.generate_pair_rules(block_names)
 
     # 4) Run the virtual growth
     engine.run_growth(
