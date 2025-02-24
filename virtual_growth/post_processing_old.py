@@ -84,6 +84,71 @@ def plot_microstructure_2d(full_mesh, all_elems, block_lib, v_data_map, names,
 
             k += 1
 
+    for y in range(rows):
+        for x in range(cols):
+            elem_id = all_elems[y*cols+x]
+            v_val_self = v_array[elem_id]
+            nodes_self = cell_nodes[y][x]
+
+            # check the left and right neighbor
+            if x+1 < cols and cell_nodes[y][x+1] is not None:
+                elem_id_neighbor = all_elems[y*cols+(x+1)]
+                v_val_neig = v_array[elem_id_neighbor]
+                if v_val_self != v_val_neig:
+                    nodes_neig = cell_nodes[y][x+1]
+                    thresh = 1e-6
+                    self_right = np.argwhere(
+                        np.isclose(nodes_self[:, 0], (x+0.5)*block_size, atol=thresh)
+                    ).flatten()
+                    neig_left = np.argwhere(
+                        np.isclose(nodes_neig[:, 0], (x+0.5)*block_size, atol=thresh)
+                    ).flatten()
+
+                    self_right_sorted = self_right[np.argsort(nodes_self[self_right, 1])]
+                    neig_left_sorted = neig_left[np.argsort(nodes_neig[neig_left, 1])]
+
+                    n_match = min(self_right_sorted.size, neig_left_sorted.size)
+
+                    for i in range(n_match):
+                        i_s = self_right_sorted[i]
+                        i_n = neig_left_sorted[i]
+                        avg_x = 0.5*(nodes_self[i_s, 0] + nodes_neig[i_n, 0])
+                        avg_y = 0.5*(nodes_self[i_s, 1] + nodes_neig[i_n, 1])
+
+                        nodes_self[i_s, 0] = avg_x
+                        nodes_self[i_s, 1] = avg_y
+                        nodes_neig[i_n, 0] = avg_x
+                        nodes_neig[i_n, 1] = avg_y
+
+            # check the bottom and top neighbor
+            if y+1 < rows and cell_nodes[y+1][x] is not None:
+                elem_id_neighbor = all_elems[(y+1)*cols + x]
+                v_val_neig = v_array[elem_id_neighbor]
+                if v_val_self != v_val_neig:
+                    nodes_neig = cell_nodes[y+1][x]
+
+                    thresh = 1e-6
+                    self_bottom = np.argwhere(
+                        np.isclose(nodes_self[:, 1], -(y+0.5)*block_size, atol=thresh)
+                    ).flatten()
+                    neig_top = np.argwhere(
+                        np.isclose(nodes_neig[:, 1], -(y+0.5)*block_size, atol=thresh)
+                    ).flatten()
+
+                    self_bottom_sorted = self_bottom[np.argsort(nodes_self[self_bottom, 0])]
+                    neig_top_sorted = neig_top[np.argsort(nodes_neig[neig_top, 0])]
+
+                    n_match = min(self_bottom_sorted.size, neig_top_sorted.size)
+                    for i in range(n_match):
+                        i_s = self_bottom_sorted[i]
+                        i_n = neig_top_sorted[i]
+                        avg_x = 0.5*(nodes_self[i_s, 0] + nodes_neig[i_n, 0])
+                        avg_y = 0.5*(nodes_self[i_s, 1] + nodes_neig[i_n, 1])
+                        nodes_self[i_s, 0] = avg_x
+                        nodes_self[i_s, 1] = avg_y
+                        nodes_neig[i_n, 0] = avg_x
+                        nodes_neig[i_n, 1] = avg_y
+
     k = 0
     for y in range(rows):
         for x in range(cols):
