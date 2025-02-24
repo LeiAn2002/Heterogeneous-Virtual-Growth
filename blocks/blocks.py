@@ -8,6 +8,10 @@ from utils.mesh_operations import process_raw_mesh, coord_transformation
 class Block(ABC):
 
     @abstractmethod
+    def get_adjacent_matrix(self, **kwargs):
+        pass
+
+    @abstractmethod
     def get_thickness(self, m, v, rotation, **kwargs):
         pass
 
@@ -26,9 +30,20 @@ class Block(ABC):
 
 class CircleBlock2D(Block):
 
-    def __init__(self, name, discre_number):
-        self.name = name
+    def __init__(self, discre_number=10):
         self.discre_number = discre_number
+
+    def get_adjacent_matrix(self, **kwargs):
+        adj_matrix = np.array([
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 1, 0, 0],
+            [0, 1, 0, 0, 0, 1, 0],
+            [1, 0, 0, 0, 0, 0, 1],
+            [0, 1, 0, 0, 0, 1, 0],
+            [0, 0, 1, 0, 1, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+        ]).astype(int),
+        return adj_matrix
 
     def get_thickness(self, m, v, rotation, **kwargs):
         thickness = m * v
@@ -59,7 +74,7 @@ class CircleBlock2D(Block):
             [m*scale, -t[1, 0]*scale, 0],
             [m*scale, t[1, 0]*scale, 0],
             [t[1, 1]*scale, m*scale, 0],
-            [-t[1, 1]*scale, m*scale, 0],  
+            [-t[1, 1]*scale, m*scale, 0],
             [-m*scale, t[0, 0]*scale, 0]
         ])
 
@@ -185,4 +200,4 @@ class BlockLibrary:
         cls = self._registry.get(block_type_name)
         if cls is None:
             raise ValueError(f"Unrecognized block type: {block_type_name}")
-        return cls(*args, **kwargs)   # 此处应当只能传入name才对，后续有待修改
+        return cls(*args, **kwargs)
