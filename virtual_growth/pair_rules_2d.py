@@ -60,7 +60,6 @@ class PairRules2D:
             block_obj = self._get_block_from_library(block_name)
 
             input_block = block_obj.get_adjacent_matrix()
-
             out_blocks = self._rotate_block(input_block)
             unique_indices = self._remove_repeated_blocks(out_blocks)
 
@@ -100,7 +99,7 @@ class PairRules2D:
 
     def _get_block_from_library(self, block_name):
         """Get the block object from the block library."""
-        return self.block_library[block_name]
+        return self.block_library.create_block(block_name)
 
     @staticmethod
     def _rotate_block(inp_block):

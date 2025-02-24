@@ -47,7 +47,7 @@ class CircleBlock2D(Block):
 
     type_name = "circle"
 
-    def __init__(self, m, v, rotation, discre_number=5):
+    def __init__(self, m=0.75, v=0.5, rotation=0, discre_number=5):
         self.m = m
         self.v = v
         self.rotation = rotation
@@ -61,8 +61,8 @@ class CircleBlock2D(Block):
             [1, 0, 0, 0, 0, 0, 1],
             [0, 1, 0, 0, 0, 1, 0],
             [0, 0, 1, 0, 1, 0, 0],
-            [0, 0, 0, 1, 0, 0, 0],
-        ]).astype(int),
+            [0, 0, 0, 1, 0, 0, 0]
+        ]).astype(int)
         return adj_matrix
 
     def get_thickness(self, **kwargs):
