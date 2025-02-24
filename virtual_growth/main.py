@@ -46,7 +46,7 @@ def main(
 
     # 1) Create a block library and register blocks
     library = BlockLibrary()
-    library.register_block("circle", CircleBlock2D)
+    library.register_block("circle")
 
     # 2) Create the engine
     engine = VirtualGrowthEngine(library)
