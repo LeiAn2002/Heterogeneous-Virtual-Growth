@@ -21,19 +21,13 @@ Citations:
 
 import numpy as np
 from virtual_growth.main import main
-from virtual_growth.pair_rules_2d import pair_rules_2d
-from virtual_growth.pair_rules_3d import pair_rules_3d
-
-
-# v = volume fracttion
-# d = 0.75*v   n = 0.75-d
 
 dim = 2
 match dim:
     case 2:
         mesh_size = (2, 2)
         element_size = (1, 1)
-        candidates = ["o"]
+        candidates = ["circle"]
         num_elems = np.prod(mesh_size)
         frequency_hints = np.random.rand(num_elems, len(candidates))
         frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
@@ -53,13 +47,10 @@ match dim:
 
         # d, m, n = 0.5, 0.75, 0.25
         m = 0.75
-        data_path = "virtual_growth_data/2d/"
         save_path = "designs/2d/"
         fig_name = "symbolic_graph.jpg"
         gif_name = "symbolic_graph.gif"
-        block_names = ["o", "x"]
-        pair_rules_2d(block_names, v_array, m=0.75, num_elems_d=3, num_elems_m=5,
-                      path_name="virtual_growth_data/2d/")
+        block_names = ["circle"]
 
     case 3:
         mesh_size = (1, 1, 1)
@@ -77,6 +68,6 @@ match dim:
 if __name__ == "__main__":
     main(mesh_size, element_size, candidates, frequency_hints,
          v_array, m, num_tries=40, print_frequency=True, make_figure=True,
-         make_gif=False, data_path=data_path, save_path=save_path,
+         make_gif=False, save_path=save_path,
          fig_name=fig_name, gif_name=gif_name, save_mesh=True,
          save_mesh_path=save_path, periodic=True)
