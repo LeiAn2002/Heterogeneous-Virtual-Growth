@@ -31,7 +31,8 @@ match dim:
         num_elems = np.prod(mesh_size)
         frequency_hints = np.random.rand(num_elems, len(candidates))
         frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
-        v_array = np.array([0.4, 0.2, 0.6, 0.9])
+        v_array = np.array([0.2, 0.25, 0.3, 0.35])
+        # v_array = np.array([0.2, 0.2, 0.2, 0.2])
 
         # first_row_v = np.linspace(0.25, 0.75, 6)
         # v_array = np.tile(first_row_v, (6, 1))
@@ -66,8 +67,9 @@ match dim:
         gif_name = "symbolic_graph.gif"
 
 if __name__ == "__main__":
-    main(mesh_size, element_size, candidates, frequency_hints,
-         v_array, m, num_tries=40, print_frequency=True, make_figure=True,
-         make_gif=False, save_path=save_path,
-         fig_name=fig_name, gif_name=gif_name, save_mesh=True,
-         save_mesh_path=save_path, periodic=True)
+    main(mesh_size, element_size, candidates, frequency_hints, v_array, m,
+         periodic=True, num_tries=40, print_frequency=True, make_figure=True,
+         make_gif=False, color="#96ADFC", save_path=save_path, fig_name=fig_name,
+         gif_name=gif_name,
+         save_mesh=True, save_mesh_path=save_path,
+         save_mesh_name="symbolic_graph.npy")

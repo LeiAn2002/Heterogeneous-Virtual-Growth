@@ -85,7 +85,7 @@ class VirtualGrowthEngine:
         candidates,
         frequency_hints,
         v_array,
-        m=6,
+        m,
         periodic=True,
         num_tries=1,
         print_frequency=True,
@@ -158,13 +158,17 @@ class VirtualGrowthEngine:
                 fill_sequence = np.zeros(self.num_cells)
 
                 self._growth_attempt(
-                    full_mesh, aug_full_mesh,
-                    block_count, fill_sequence,
-                    mesh_size, elem_size,
-                    aug_candidates_encoded, aug_candidates_encoded_ref,
-                    aug_frequency_hints, v_array,
-                    m, periodic,
-                    rules, rotation_table, special_rules
+                    full_mesh,
+                    aug_full_mesh,
+                    block_count,
+                    fill_sequence,
+                    aug_candidates_encoded,
+                    aug_candidates_encoded_ref,
+                    aug_frequency_hints,
+                    periodic,
+                    rules,
+                    rotation_table,
+                    special_rules
                 )
                 admissible = True
                 break
@@ -180,7 +184,6 @@ class VirtualGrowthEngine:
 
         # Post-processing
         self._post_process(
-            self,
             m,
             v_array,
             full_mesh,
@@ -395,6 +398,7 @@ class VirtualGrowthEngine:
         """
         final_frequency = compute_final_frequency(block_count, self.num_elems, aug_candidates, candidates)
 
+
         if (make_figure or make_gif) and save_path != "" and not os.path.exists(save_path):
             os.makedirs(save_path)
 
@@ -422,7 +426,7 @@ class VirtualGrowthEngine:
         if make_figure:
             # Example 2D call:
             elements, cell_types, nodes, element_count = plot_microstructure_2d(
-                m, full_mesh, self.all_elems, self.block_library, v_array, color, save_path, fig_name)
+                m, full_mesh, self.all_elems, self.block_library, v_array, color=color, save_path=save_path, fig_name=fig_name)
 
         if make_gif:
             plot_microstructure_gif()  # 需要修改！！！！！

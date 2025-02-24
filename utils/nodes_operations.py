@@ -15,7 +15,7 @@ def get_center_radius(point1, point2):
     mid_point = (point1 + point2) / 2
     lenth = np.linalg.norm(point1 - point2)
     angle_with_horizontal = np.arctan2(point2[1] - point1[1], point2[0] - point1[0])
-    angle_with_vertical = np.acrctan2(point2[0] - point1[0], point2[1] - point1[1])
+    angle_with_vertical = np.arctan2(point2[0] - point1[0], point2[1] - point1[1])
     acute_horizontal = to_acute(angle_with_horizontal)
     acute_vertical = to_acute(angle_with_vertical)
     angle = acute_horizontal if acute_horizontal < acute_vertical else acute_vertical

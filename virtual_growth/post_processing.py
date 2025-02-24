@@ -66,7 +66,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             elem_id = all_elems[k]
             v_val = v_array[elem_id]
             block_class = block_library.create_block(parent, m, v_val, rotation)
-            thickness_matrices[y, x] = block_class.get_thickness_matrix()
+            thickness_matrices[y, x] = block_class.get_thickness()
             k += 1
 
     # get the connectivity-ganranteeing thickness matrices
@@ -74,11 +74,11 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
         for x in range(full_mesh.shape[1]):
             if x < full_mesh.shape[1] - 1:
                 avg = (thickness_matrices[y, x, 1, 0] + thickness_matrices[y, x + 1, 0, 0]) / 2
-                thickness_matrices[y, x, 0, 1] = avg
+                thickness_matrices[y, x, 1, 0] = avg
                 thickness_matrices[y, x + 1, 0, 0] = avg
             if y < full_mesh.shape[0] - 1:
                 avg = (thickness_matrices[y, x, 0, 1] + thickness_matrices[y + 1, x, 1, 1]) / 2
-                thickness_matrices[y, x, 1, 0] = avg
+                thickness_matrices[y, x, 0, 1] = avg
                 thickness_matrices[y + 1, x, 1, 1] = avg
 
     k = 0
