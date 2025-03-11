@@ -26,12 +26,12 @@ dim = 2
 match dim:
     case 2:
         mesh_size = (2, 2)
-        element_size = (1, 1)
+        element_size = (2, 2)
         candidates = ["circle"]
         num_elems = np.prod(mesh_size)
         frequency_hints = np.random.rand(num_elems, len(candidates))
         frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
-        v_array = np.array([0.2, 0.25, 0.3, 0.35])
+        v_array = np.array([0.2, 0.35, 0.45, 0.6])
         # v_array = np.array([0.2, 0.2, 0.2, 0.2])
 
         # first_row_v = np.linspace(0.25, 0.75, 6)
