@@ -181,15 +181,20 @@ def generate_random_field(N=128, alpha=3, tmax=0.2, coverage_thresh=0.1, max_ite
             continue
 
         # Use skimage's label function to check 4-connectivity
-        if not check_connectivity(f_bin):
+        # if not check_connectivity(f_bin):
+        #     continue
+
+        if not boundary_condition_satisfied(f_bin, margin=boundary_margin):
             continue
 
         if not check_inner_connectivity(f_bin):
             continue
         # By default we only check coverage.
         # If we need exactly one connected component, we might check num_components == 1.
-        if np.abs(coverage-coverage_thresh) > 0.05:
-            # If conditions are met, mirror the field and return
+        # if np.abs(coverage-coverage_thresh) > 0.05:
+        #     # If conditions are met, mirror the field and return
+        #     continue
+        if coverage < coverage_thresh:
             continue
         # if not boundary_condition_satisfied(f_bin, margin=boundary_margin):
         #     continue
@@ -215,14 +220,14 @@ def mirror_field(field_2d):
 
 # ============== Test Example ==============
 if __name__ == "__main__":
-    N = 256    # Grid size
+    N =16    # Grid size
     alpha = 3   # Power-law exponent
     tmax = 1  # Max threshold value
     seed = 42   # Random seed for reproducibility
-    boundary_margin = 0.3  # Fraction of the edge that should be 1
+    boundary_margin = coverage_thresh = 0.1  # Fraction of the edge that should be 1
 
     f_mirror, f_bin, f_real = generate_random_field(N=N, alpha=alpha, tmax=tmax, 
-                                                    coverage_thresh=0.3, max_iter=100000, 
+                                                    coverage_thresh=coverage_thresh, max_iter=1000000, 
                                                     seed=seed, boundary_margin=boundary_margin)
     if f_mirror is not None:
         # Visualization
