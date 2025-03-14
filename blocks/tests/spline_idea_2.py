@@ -212,7 +212,7 @@ def demo_block_generation(
     ax.set_ylim(ymin, ymax)
     ax.set_title("Random Block Generation Demo")
     out_image = "random_block_idea_2.png"
-    plt.savefig(out_image, dpi=200)
+    plt.savefig(out_image, dpi=30)
     
     mask = image_to_mask_array(out_image)
     plt.figure()
