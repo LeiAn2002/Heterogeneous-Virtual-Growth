@@ -174,7 +174,7 @@ if __name__ == "__main__":
     # Random radius for inner points
     r = 0.33
     # Strip thickness
-    thickness = 0.3
+    thickness = 0.2
     
     # Run the demo
     demo_block_generation(
