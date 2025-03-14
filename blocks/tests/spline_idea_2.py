@@ -182,11 +182,11 @@ def demo_block_generation(
     
     # 4. Plot
     fig, ax = plt.subplots()
-    
+    ax.axis("off")
     # Plot bounding box for reference
-    x_box = [xmin, xmin, xmax, xmax, xmin]
-    y_box = [ymin, ymax, ymax, ymin, ymin]
-    ax.plot(x_box, y_box, color='black', lw=1)
+    # x_box = [xmin, xmin, xmax, xmax, xmin]
+    # y_box = [ymin, ymax, ymax, ymin, ymin]
+    # ax.plot(x_box, y_box, color='black', lw=1)
     
     # Plot the clipped shape
     if final_shape.geom_type == 'Polygon':
@@ -200,19 +200,19 @@ def demo_block_generation(
         x_ext, y_ext = final_shape.exterior.xy
         ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
     
-    if plot_control_points:
-        # Also plot the control points (randomized or pinned)
-        cpx, cpy = zip(*control_points)
-        ax.scatter(cpx, cpy, color='red', marker='o')
+    # if plot_control_points:
+    #     # Also plot the control points (randomized or pinned)
+    #     cpx, cpy = zip(*control_points)
+    #     ax.scatter(cpx, cpy, color='red', marker='o')
     
-    for xs, ys in zip(x_corr, y_corr):
-        ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
-    ax.set_aspect('equal', 'box')
+    # for xs, ys in zip(x_corr, y_corr):
+    #     ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
+    # ax.set_aspect('equal', 'box')
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    ax.set_title("Random Block Generation Demo")
+    # ax.set_title("Random Block Generation Demo")
     out_image = "random_block_idea_2.png"
-    plt.savefig(out_image, dpi=30)
+    plt.savefig(out_image, dpi=20)
     
     mask = image_to_mask_array(out_image)
     plt.figure()
@@ -220,6 +220,7 @@ def demo_block_generation(
     plt.title("Raster Mask from PNG")
     plt.colorbar()
     plt.savefig("pixel.png")
+
 
 def cross_block(radius, vf):
     # Define outer points (pinned):
