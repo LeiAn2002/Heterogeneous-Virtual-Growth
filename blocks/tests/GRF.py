@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.measure import label
 from skimage.measure import regionprops
+import time
 
 
 def boundary_condition_satisfied(f_bin, margin=0.2):
@@ -149,7 +150,7 @@ def generate_random_field(N=128, alpha=3, tmax=0.2, coverage_thresh=0.1, max_ite
         # 1) Generate complex noise Z(k1, k2) = X + iY, where X, Y ~ N(0,1)
         X = np.random.normal(loc=0.0, scale=1.0, size=(N, N))
         Y = np.random.normal(loc=0.0, scale=1.0, size=(N, N))
-        Z = X + 1j * Y  # complex random matrix
+        Z = X + 1j * Y  # complex random matrix     
 
         # 2) Multiply by the spectral weight: F_k1,k2 = Z_k1,k2 * P(k1, k2)
         F = Z * P
@@ -181,11 +182,11 @@ def generate_random_field(N=128, alpha=3, tmax=0.2, coverage_thresh=0.1, max_ite
             continue
 
         # Use skimage's label function to check 4-connectivity
-        # if not check_connectivity(f_bin):
-        #     continue
-
-        if not boundary_condition_satisfied(f_bin, margin=boundary_margin):
+        if not check_connectivity(f_bin):
             continue
+
+        # if not boundary_condition_satisfied(f_bin, margin=boundary_margin):
+        #     continue
 
         if not check_inner_connectivity(f_bin):
             continue
@@ -220,15 +221,18 @@ def mirror_field(field_2d):
 
 # ============== Test Example ==============
 if __name__ == "__main__":
-    N =16    # Grid size
+    N = 256    # Grid size
     alpha = 3   # Power-law exponent
     tmax = 1  # Max threshold value
-    seed = 42   # Random seed for reproducibility
+    seed = 72   # Random seed for reproducibility
     boundary_margin = coverage_thresh = 0.1  # Fraction of the edge that should be 1
+    start_time = time.time()
 
     f_mirror, f_bin, f_real = generate_random_field(N=N, alpha=alpha, tmax=tmax, 
                                                     coverage_thresh=coverage_thresh, max_iter=1000000, 
                                                     seed=seed, boundary_margin=boundary_margin)
+    end_time = time.time()
+    print(f"Time taken: {end_time - start_time:.4f} seconds")
     if f_mirror is not None:
         # Visualization
         fig, axs = plt.subplots(1, 3, figsize=(12, 4))

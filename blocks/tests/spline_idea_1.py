@@ -212,7 +212,7 @@ def demo_block_generation(
     
     # for xs, ys in zip(x_corr, y_corr):
     #     ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
-    # ax.set_aspect('equal', 'box')
+    ax.set_aspect('equal', 'box')
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     # ax.set_title("Random Block Generation Demo")
@@ -227,7 +227,7 @@ def demo_block_generation(
     plt.savefig("pixel.png")
 
 
-def cross_block(radius, vf):
+def cross_block(radius, vf, boundary_vf):
     # Define outer points (pinned):
     # Each pair is (exact boundary point, close neighbor).
     # This helps keep the tangent near vertical/horizontal at edges.
@@ -266,22 +266,22 @@ def cross_block(radius, vf):
 
     forbidden_edges = [[(-1, -1, -1, 1),
                         (1, -1, 1, 1),
-                        (-1, -1, -vf[0][0], -1),
-                        (vf[0][0], -1, 1, -1), 
-                        (-1, 1, -vf[0][-1], 1), 
-                        (vf[0][-1], 1, 1, 1)], 
+                        (-1, -1, -boundary_vf[0][0], -1),
+                        (boundary_vf[0][0], -1, 1, -1), 
+                        (-1, 1, -boundary_vf[0][-1], 1), 
+                        (boundary_vf[0][-1], 1, 1, 1)], 
                        [(-1, -1, 1, -1),
                         (-1, 1, 1, 1),
-                        (-1, -1, -1, -vf[1][0]),
-                        (-1, vf[1][0], -1, 1), 
-                        (1, -1, 1, -vf[1][-1]), 
-                        (1, vf[1][-1], 1, 1)
+                        (-1, -1, -1, -boundary_vf[1][0]),
+                        (-1, boundary_vf[1][0], -1, 1), 
+                        (1, -1, 1, -boundary_vf[1][-1]), 
+                        (1, boundary_vf[1][-1], 1, 1)
                         ]]
 
     return basic_points, outer_count, curve_definitions, r, forbidden_edges
 
 
-def L_block(radius, vf):
+def L_block(radius, vf, boundary_vf):
     outer_basic_points = [        
         (-1/3, 1),   # left boundary
         (-1/3, 0.99999999),
@@ -305,20 +305,29 @@ def L_block(radius, vf):
     forbidden_edges = [[(-1, -1, -1, 1),
                         (-1, -1, 1, -1),
                         (1/3, 1, 1, 1),
-                        (-1, 1, -1+2/3*(1-vf[0][0]), 1),
-                        (-1/3+2/3*(1-vf[0][0]), 1, 1/3, 1),
-                        (1, -1, 1, -vf[0][-1]),
-                        (1, vf[0][-1], 1, 1)]]
+                        (-1, 1, -1+2/3*(1-boundary_vf[0][0]), 1),
+                        (-1/3+2/3*(boundary_vf[0][0]), 1, 1/3, 1),
+                        (1, -1, 1, -boundary_vf[0][-1]),
+                        (1, boundary_vf[0][-1], 1, 1)]]
 
     return basic_points, outer_count, curve_definitions, r, forbidden_edges
 
 
 if __name__ == "__main__":
 
-    radius = 0.8
-    vf = [[0.4, 0.4, 0.1, 0.5, 0.4, 0.4], [0.3, 0.3, 0.3, 0.2, 0.4, 0.4]]
-    # vf = [[0.3, 0.3, 0.3, 0.2, 0.4, 0.4]]
-    basic_points, outer_count, curve_definitions, r, forbidden_edges = cross_block(radius, vf)
+    radius = 0
+    lower_boundary_vf = [[0.5, 0.5], [0.5, 0.5]]
+    upper_boundary_vf = [[0.5, 0.5], [0.5, 0.5]]
+    # Randomly choose boundary values between lower and upper bounds
+    boundary_vf = [[random.uniform(lower_boundary_vf[i][j], upper_boundary_vf[i][j]) for j in range(len(lower_boundary_vf[i]))] for i in range(len(lower_boundary_vf))]
+    lower_vf = [1, 0.5, 0.5, 1]
+    upper_vf = [1, 0.5, 0.5, 1]
+    # vf randomly chosen between lower and upper bounds
+    dimension = 1
+    vf = [[random.uniform(lower_vf[i], upper_vf[i]) for i in range(len(lower_vf))] for _ in range(dimension)]
+    for i in range(dimension):
+        vf[i] = [vf[i][0]] + vf[i] + [vf[i][-1]]
+    basic_points, outer_count, curve_definitions, r, forbidden_edges = L_block(radius, vf, boundary_vf)
     # Run the demo
     demo_block_generation(
         basic_points=basic_points,
