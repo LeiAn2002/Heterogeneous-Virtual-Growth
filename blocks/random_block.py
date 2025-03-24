@@ -1,11 +1,103 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import time
+import io
 
-from shapely.geometry import LineString, box, Point
+from shapely.geometry import LineString
 from shapely.ops import unary_union
 from scipy.interpolate import make_interp_spline
+from scipy.sparse import coo_matrix
 from PIL import Image
+
+
+def build_filter_matrix(H, W, r):
+    """
+    Build a sparse matrix for a 2D 'linear filter' of radius r on a (H x W) grid.
+    Each row e corresponds to one pixel (y, x).
+    Each column i also corresponds to one pixel.
+    The entry (e, i) = max(0, r - dist(e,i)) if dist(e,i) < r, else 0.
+    
+    Returns:
+        H_sp: sparse matrix of shape [N, N], N = H*W
+        row_sum: an array of row sums (for normalizing).
+    """
+    # We'll flatten pixel index as e = y*W + x
+    # Helper function: 2D->1D
+    def idx(x, y):
+        return y*W + x
+    
+    row_idx = []
+    col_idx = []
+    data = []
+    
+    r_int = int(np.ceil(r))
+    for y in range(H):
+        for x in range(W):
+            e = idx(x, y)
+            
+            # local window in [x-r_int, x+r_int] etc
+            x_min = max(0, x - r_int)
+            x_max = min(W-1, x + r_int)
+            y_min = max(0, y - r_int)
+            y_max = min(H-1, y + r_int)
+            
+            for yy in range(y_min, y_max+1):
+                for xx in range(x_min, x_max+1):
+                    dist = np.sqrt((xx - x)**2 + (yy - y)**2)
+                    if dist < r:
+                        w = r - dist
+                        col = idx(xx, yy)
+                        
+                        row_idx.append(e)
+                        col_idx.append(col)
+                        data.append(w)
+    
+    N = H * W
+    H_coo = coo_matrix((data, (row_idx, col_idx)), shape=(N, N), dtype=np.float32)
+    H_sp = H_coo.tocsr()
+    row_sum = np.array(H_sp.sum(axis=1)).ravel()  # shape=(N,)
+    return H_sp, row_sum
+
+
+def linear_filter(mask, r, H_sp=None, row_sum=None):
+    """
+    Apply a radius-r linear filter to the mask using the sparse matrix approach.
+    If H_sp and row_sum are not given, we'll build them on the fly (slower).
+    
+    mask: 2D numpy array (H x W)
+    r:    filter radius (float)
+    H_sp, row_sum: optional precomputed filter matrix and row sums.
+    
+    Returns:
+        new_mask: 2D array of same shape, filtered by the linear kernel.
+    """
+    H, W = mask.shape
+    N = H*W
+    # flatten mask
+    x_vec = mask.reshape(-1).astype(np.float32)
+    
+    # Build filter matrix if not provided
+    if H_sp is None or row_sum is None:
+        H_sp, row_sum = build_filter_matrix(H, W, r)
+    
+    # multiply
+    x_filtered = H_sp.dot(x_vec)
+    # row-wise normalize
+    with np.errstate(divide='ignore', invalid='ignore'):
+        x_filtered /= row_sum
+    
+    # reshape
+    new_mask = x_filtered.reshape(H, W)
+    return new_mask
+
+
+def heaviside(mask, beta=32):
+    """
+    Apply a Heaviside function to the mask.
+    The Heaviside function is approximated by a sigmoid with slope beta.
+    """
+    return (np.tanh(beta * 0.5) + np.tanh(beta * (mask - 0.5))) / (2 * np.tanh(beta * 0.5))
 
 
 def image_to_mask_array(png_file, threshold=10):
@@ -31,6 +123,10 @@ def image_to_mask_array(png_file, threshold=10):
 
 
 def point_to_segment_distance(px, py, x1, y1, x2, y2):
+    """
+    Compute the nearest distance between a point and a line segment.
+    The line segment is defined by two points (x1, y1) and (x2, y2).
+    """
     segment_vec = np.array([x2 - x1, y2 - y1])
     point_vec = np.array([px - x1, py - y1])
 
@@ -43,18 +139,24 @@ def point_to_segment_distance(px, py, x1, y1, x2, y2):
     return np.linalg.norm(np.array([px, py]) - nearest)
 
 
-def generate_random_control_points(basic_points, r, inner_points_number):
+def generate_random_control_points(basic_points, r, outer_count):
     """
     Generate control points for each basic point.
     - The first 'outer_count' points are considered 'outer/pinned' and will NOT be randomized.
     - The remaining points (inner) will be moved randomly within radius r.
     """
-    control_points = basic_points.copy()
-    for i in range(inner_points_number):
-        rr = random.uniform(0, r)
-        angle = random.uniform(0, 2*np.pi)
-        cx = rr * np.cos(angle)
-        cy = rr * np.sin(angle)
+    # random.seed(42)
+    control_points = []
+    for i, (bx, by) in enumerate(basic_points):
+        if i < outer_count:
+            # Keep outer points fixed
+            cx, cy = bx, by
+        else:
+            # Randomize inner points within a circle of radius r
+            rr = random.uniform(0, r)
+            angle = random.uniform(0, 2*np.pi)
+            cx = bx + rr * np.cos(angle)
+            cy = by + rr * np.sin(angle)
         control_points.append((cx, cy))
     return control_points
 
@@ -71,10 +173,6 @@ def generate_bspline_curve(points, num_samples=200):
     t = np.arange(n)
     # Use min(3, n-1) to avoid errors if points are too few
     spline = make_interp_spline(t, pts, k=min(3, n-1))
-    # t_new = np.linspace(t[0], t[-1], num_samples)
-    # xy_new = spline(t_new)
-    # xs, ys = xy_new[:, 0], xy_new[:, 1]
-    # return xs, ys
     xs = []
     ys = []
     for i in range(n - 1):
@@ -132,12 +230,13 @@ def thicken_curve(xs, ys, forbidden_edges, vf, cap_style="flat"):
 
 
 def demo_block_generation(
-    outer_points,
-    inner_points_number,
+    basic_points,
+    outer_count,
     r,
     curve_definitions,
     vf,
     forbidden_edges_set,
+    r_filter,
     plot_control_points=True,
     boundary=(-1, -1, 1, 1)
 ):
@@ -150,7 +249,7 @@ def demo_block_generation(
     5. Visualize.
     """
     # 1. Generate control points
-    control_points = generate_random_control_points(outer_points, r, inner_points_number)
+    control_points = generate_random_control_points(basic_points, r, outer_count)
     
     # 2. Build and thicken each sub-curve
     shapes = []
@@ -161,7 +260,7 @@ def demo_block_generation(
         sub_ctrls = [control_points[i] for i in subset]
         forbidden_edges = forbidden_edges_set[count]
         v = vf[count]
-        xs, ys = generate_bspline_curve(sub_ctrls, num_samples=500)
+        xs, ys = generate_bspline_curve(sub_ctrls, num_samples=300)
         for i in range(len(xs)):
             x_sub = xs[i]
             y_sub = ys[i]
@@ -207,22 +306,28 @@ def demo_block_generation(
     
     # for xs, ys in zip(x_corr, y_corr):
     #     ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
-    # ax.set_aspect('equal', 'box')
+    ax.set_aspect('equal', 'box')
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     # ax.set_title("Random Block Generation Demo")
-    out_image = "random_block_idea_2.png"
-    plt.savefig(out_image, dpi=20)
-    
-    mask = image_to_mask_array(out_image)
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=30)
+    plt.close()
+
+    mask = image_to_mask_array(buf)
+
+    mask = linear_filter(mask, r_filter)
+
+    mask = heaviside(mask, beta=128)
+
     plt.figure()
-    plt.imshow(mask, origin='upper', cmap='gray')
+    plt.imshow(mask, origin='upper', cmap='gray_r')
     plt.title("Raster Mask from PNG")
     plt.colorbar()
     plt.savefig("pixel.png")
 
 
-def cross_block(radius, vf):
+def cross_block(radius, vf, boundary_vf):
     # Define outer points (pinned):
     # Each pair is (exact boundary point, close neighbor).
     # This helps keep the tangent near vertical/horizontal at edges.
@@ -241,33 +346,42 @@ def cross_block(radius, vf):
     ]
     
     # Define inner points (to be randomized)
-    inner_points_number = 4
+    inner_basic_points = [
+        (0, -1/3),
+        (0, 1/3),
+        (-1/3, 0),
+        (1/3, 0),
+    ]
     
+    basic_points = outer_basic_points + inner_basic_points
+    outer_count = len(outer_basic_points)
+
     curve_definitions = [
         [0, 1, 8, 9, 2, 3],   # bottom->inner->top (vertical)
         [4, 5, 10, 11, 6, 7],   # left->inner->right (horizontal)
     ]
-    
+
     # Random radius for inner points
     r = radius
 
     forbidden_edges = [[(-1, -1, -1, 1),
                         (1, -1, 1, 1),
-                        (-1, -1, -vf[0][0], -1),
-                        (vf[0][0], -1, 1, -1), 
-                        (-1, 1, -vf[0][-1], 1), 
-                        (vf[0][-1], 1, 1, 1)], 
+                        (-1, -1, -boundary_vf[0][0], -1),
+                        (boundary_vf[0][0], -1, 1, -1), 
+                        (-1, 1, -boundary_vf[0][-1], 1), 
+                        (boundary_vf[0][-1], 1, 1, 1)], 
                        [(-1, -1, 1, -1),
                         (-1, 1, 1, 1),
-                        (-1, -1, -1, -vf[1][0]),
-                        (-1, vf[1][0], -1, 1), 
-                        (1, -1, 1, -vf[1][-1]), 
-                        (1, vf[1][-1], 1, 1)
-                        ]]   # 为什么有vf项：确保相交的部分也只与边界指定位置相交
-    return outer_basic_points, inner_points_number, curve_definitions, r, forbidden_edges
+                        (-1, -1, -1, -boundary_vf[1][0]),
+                        (-1, boundary_vf[1][0], -1, 1), 
+                        (1, -1, 1, -boundary_vf[1][-1]), 
+                        (1, boundary_vf[1][-1], 1, 1)
+                        ]]
+
+    return basic_points, outer_count, curve_definitions, r, forbidden_edges
 
 
-def L_block(radius, vf):
+def L_block(radius, vf, boundary_vf):
     outer_basic_points = [        
         (-1/3, 1),   # left boundary
         (-1/3, 0.99999999),
@@ -276,7 +390,13 @@ def L_block(radius, vf):
         (1, 0),
     ]
 
-    inner_points_number = 2
+    inner_basic_points = [
+        (-1/3, 0.5),
+        (0.5, 0)
+    ]
+
+    basic_points = outer_basic_points + inner_basic_points
+    outer_count = len(outer_basic_points)
 
     curve_definitions = [[0, 1, 4, 5, 2, 3]]
 
@@ -285,27 +405,39 @@ def L_block(radius, vf):
     forbidden_edges = [[(-1, -1, -1, 1),
                         (-1, -1, 1, -1),
                         (1/3, 1, 1, 1),
-                        (-1, 1, -1+2/3*(1-vf[0][0]), 1),
-                        (-1/3+2/3*(1-vf[0][0]), 1, 1/3, 1),
-                        (1, -1, 1, -vf[0][-1]),
-                        (1, vf[0][-1], 1, 1)]]
+                        (-1, 1, -1+2/3*(1-boundary_vf[0][0]), 1),
+                        (-1/3+2/3*(boundary_vf[0][0]), 1, 1/3, 1),
+                        (1, -1, 1, -boundary_vf[0][-1]),
+                        (1, boundary_vf[0][-1], 1, 1)]]
 
-    return outer_basic_points, inner_points_number, curve_definitions, r, forbidden_edges
+    return basic_points, outer_count, curve_definitions, r, forbidden_edges
 
 
 if __name__ == "__main__":
-
-    radius = 0.7
-    vf = [[0.4, 0.4, 0.1, 0.5, 0.4, 0.4], [0.3, 0.3, 0.3, 0.2, 0.4, 0.4]]
-    # vf = [[0.3, 0.3, 0.3, 0.2, 0.4, 0.4]]
-    outer_basic_points, inner_points_number, curve_definitions, r, forbidden_edges = cross_block(radius, vf)
+    start_time = time.time()
+    r_filter = 5
+    radius = 0.8
+    lower_boundary_vf = [[0.5, 0.5], [0.5, 0.5]]
+    upper_boundary_vf = [[0.5, 0.5], [0.5, 0.5]]
+    # Randomly choose boundary values between lower and upper bounds
+    boundary_vf = [[random.uniform(lower_boundary_vf[i][j], upper_boundary_vf[i][j]) for j in range(len(lower_boundary_vf[i]))] for i in range(len(lower_boundary_vf))]
+    lower_vf = [1, 0.5, 0.5, 1]
+    upper_vf = [1, 0.5, 0.5, 1]
+    # vf randomly chosen between lower and upper bounds
+    dimension = 2
+    vf = [[random.uniform(lower_vf[i], upper_vf[i]) for i in range(len(lower_vf))] for _ in range(dimension)]
+    for i in range(dimension):
+        vf[i] = [vf[i][0]] + vf[i] + [vf[i][-1]]
+    basic_points, outer_count, curve_definitions, r, forbidden_edges = cross_block(radius, vf, boundary_vf)
     # Run the demo
     demo_block_generation(
-        outer_points=outer_basic_points,
-        inner_points_number=inner_points_number,
+        basic_points=basic_points,
+        outer_count=outer_count,
         r=r,
         curve_definitions=curve_definitions,
         vf=vf,
         forbidden_edges_set=forbidden_edges,
+        r_filter=r_filter,
         plot_control_points=True
     )
+    print("Elapsed time: ", time.time() - start_time)
