@@ -85,6 +85,7 @@ class VirtualGrowthEngine:
         candidates,
         frequency_hints,
         v_array,
+        r_array,
         m,
         periodic=True,
         num_tries=1,
@@ -154,7 +155,7 @@ class VirtualGrowthEngine:
                     full_mesh = np.full((self.num_cells_z, self.num_cells_y, self.num_cells_x), -1, dtype=object)
                     aug_full_mesh = np.full((self.num_cells_z+2, self.num_cells_y+2, self.num_cells_x+2), -2, dtype=object)
 
-                block_count = np.zeros((self.num_elems, len(candidates)))
+                block_count = np.zeros((self.num_elems, len(aug_candidates)))
                 fill_sequence = np.zeros(self.num_cells)
 
                 self._growth_attempt(
@@ -186,6 +187,7 @@ class VirtualGrowthEngine:
         self._post_process(
             m,
             v_array,
+            r_array,
             full_mesh,
             block_count,
             aug_candidates,
@@ -376,6 +378,7 @@ class VirtualGrowthEngine:
         self,
         m,
         v_array,
+        r_array,
         full_mesh,
         block_count,
         aug_candidates,
@@ -425,8 +428,8 @@ class VirtualGrowthEngine:
         # If you want to produce figures or GIF, call plot functions
         if make_figure:
             # Example 2D call:
-            elements, cell_types, nodes, element_count = plot_microstructure_2d(
-                m, full_mesh, self.all_elems, self.block_library, v_array, color=color, save_path=save_path, fig_name=fig_name)
+            final_raster = plot_microstructure_2d(
+                m, full_mesh, self.all_elems, self.block_library, v_array, r_array, color=color, save_path=save_path, fig_name=fig_name)
 
         if make_gif:
             plot_microstructure_gif()  # 需要修改！！！！！
