@@ -51,7 +51,7 @@ match dim:
         # frequency_hints = np.vstack([flattened, second_third_row])
         # frequency_hints = frequency_hints.T
 
-        first_row_4 = np.linspace(0, 0.9, 6)
+        first_row_4 = np.linspace(0.7, 0, 6)
         r_array = np.tile(first_row_4, (6, 1))
         r_array = r_array.flatten()
 
@@ -78,7 +78,7 @@ match dim:
 if __name__ == "__main__":
     start_time = time.time()
     main(mesh_size, element_size, candidates, frequency_hints, v_array, r_array, m,
-         periodic=False, num_tries=40, print_frequency=True, make_figure=True,
+         periodic=True, num_tries=40, print_frequency=True, make_figure=True,
          make_gif=False, color="#96ADFC", save_path=save_path, fig_name=fig_name,
          gif_name=gif_name,
          save_mesh=True, save_mesh_path=save_path,
