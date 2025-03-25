@@ -30,6 +30,7 @@ def main(
         candidates,
         frequency_hints,
         v_array: np.ndarray,
+        r_array: np.ndarray,
         m=6,
         periodic=True,
         num_tries=1,
@@ -46,7 +47,8 @@ def main(
 
     # 1) Create a block library and register blocks
     library = BlockLibrary()
-    library.register_block("circle")
+    for block_type in candidates:
+        library.register_block(block_type)
 
     # 2) Create the engine
     engine = VirtualGrowthEngine(library)
@@ -61,6 +63,7 @@ def main(
         candidates,
         frequency_hints,
         v_array,
+        r_array,
         m,
         periodic=periodic,
         num_tries=num_tries,

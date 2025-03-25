@@ -22,6 +22,8 @@ Citations:
 from collections import Counter
 import numpy as np
 import pyvista
+import matplotlib.pyplot as plt
+from blocks.random_block import linear_filter, heaviside
 
 from utils.remove_repeated_nodes import remove_repeated_nodes
 
@@ -43,18 +45,13 @@ def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
 
 
 def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
-                           v_array, solid=[], void=[], color="#96ADFC",
+                           v_array, r_array, solid=[], void=[], color="#96ADFC",
                            save_path="", fig_name="microstructure.jpg"):
     block_size = 2 * m
     rows, cols = full_mesh.shape
-    cell_nodes = [[None for _ in range(cols)] for _ in range(rows)]
-    cell_elems = [[None for _ in range(cols)] for _ in range(rows)]
 
-    node_count = 0
-    element_count = np.zeros(full_mesh.size, dtype=int)
-    element_list, node_list = [], []
     k = 0
-    thickness_matrices = np.zeros((full_mesh.shape[0], full_mesh.shape[1], 2, 2))
+    thickness_matrices = np.zeros((rows, cols, 2, 2))
 
     # get the initial thickness matrices
     for y in range(full_mesh.shape[0]):
@@ -64,22 +61,29 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             suffix_str = block[block.index(" ") + 1:]
             rotation = int(suffix_str)
             elem_id = all_elems[k]
-            v_val = v_array[elem_id]
-            block_class = block_library.create_block(parent, m, v_val, rotation)
+            v_range = v_array[elem_id]
+            random_radius = r_array[elem_id]
+            block_class = block_library.create_block(parent, m, v_range, rotation, random_radius)
             thickness_matrices[y, x] = block_class.get_thickness()
             k += 1
+    # print(thickness_matrices)
 
     # get the connectivity-ganranteeing thickness matrices
     for y in range(full_mesh.shape[0]):
         for x in range(full_mesh.shape[1]):
             if x < full_mesh.shape[1] - 1:
-                avg = (thickness_matrices[y, x, 1, 0] + thickness_matrices[y, x + 1, 0, 0]) / 2
-                thickness_matrices[y, x, 1, 0] = avg
-                thickness_matrices[y, x + 1, 0, 0] = avg
+                avg = (thickness_matrices[y, x, 1, 1] + thickness_matrices[y, x + 1, 1, 0]) / 2
+                thickness_matrices[y, x, 1, 1] = avg
+                thickness_matrices[y, x + 1, 1, 0] = avg
             if y < full_mesh.shape[0] - 1:
-                avg = (thickness_matrices[y, x, 0, 1] + thickness_matrices[y + 1, x, 1, 1]) / 2
-                thickness_matrices[y, x, 0, 1] = avg
-                thickness_matrices[y + 1, x, 1, 1] = avg
+                avg = (thickness_matrices[y, x, 0, 0] + thickness_matrices[y + 1, x, 0, 1]) / 2
+                thickness_matrices[y, x, 0, 0] = avg
+                thickness_matrices[y + 1, x, 0, 1] = avg
+
+    block_size = 73
+    final_height = rows * block_size
+    final_width = cols * block_size
+    final_raster = np.zeros((final_height, final_width), dtype=np.uint8)
 
     k = 0
     for y in range(full_mesh.shape[0]):
@@ -89,54 +93,30 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             suffix_str = block[block.index(" ") + 1:]
             rotation = int(suffix_str)
             elem_id = all_elems[k]
-            v_val = v_array[elem_id]
-            block_class = block_library.create_block(parent, m, v_val, rotation)
-            elements = block_class.generate_elements().copy()
-            nodes = block_class.generate_nodes(thickness_matrices[y, x]).copy()
-            nodes[:, 0] += block_size * x
-            nodes[:, 1] -= block_size * y  # Note here it should minus
-            cell_nodes[y][x] = nodes
-            cell_elems[y][x] = elements
+            v_range = v_array[elem_id]
+            random_radius = r_array[elem_id]
+            block_class = block_library.create_block(parent, m, v_range, rotation, random_radius)
+            block_matrix = block_class.generate_block_shape(thickness_matrices[y, x])
+            top = y * block_size
+            left = x * block_size
+            final_raster[top:top+block_size, left:left+block_size] = np.maximum(
+                final_raster[top:top+block_size, left:left+block_size],
+                block_matrix
+            )
             k += 1
+    final_raster = linear_filter(final_raster, 5)
+    final_raster = heaviside(final_raster, 128)
 
-    k = 0
-    for y in range(rows):
-        for x in range(cols):
-            local_nodes = cell_nodes[y][x]
-            local_elems = cell_elems[y][x].copy()
-            local_elems[:, 1:] += node_count
-            node_list.extend(local_nodes.tolist())
-            element_list.extend(local_elems.tolist())
+    plt.figure(figsize=(8, 8))
+    plt.axis("off")
+    plt.imshow(final_raster, cmap="gray_r", origin="upper")
+    # plt.colorbar()
+    # plt.title("Microstructure 2D Binary Raster")
+    if save_path:
+        plt.savefig(save_path + fig_name, bbox_inches="tight")
+    plt.close()
 
-            element_count[k] = local_elems.shape[0]
-            node_count += local_nodes.shape[0]
-            k += 1
-
-    elements = np.array(element_list)
-    nodes = np.array(node_list)
-    nodes, elements = remove_repeated_nodes(nodes, elements[:, 1:], precision=6)
-    elements = np.hstack((
-        np.full((elements.shape[0], 1), elements.shape[1]), elements,
-    )).astype(int)
-    cell_types = np.full(elements.shape[0], 9, dtype=int)
-
-    pyvista.OFF_SCREEN = True
-    pyvista.set_plot_theme("document")
-    pyvista.start_xvfb()
-    figsize = 2000
-    plotter = pyvista.Plotter(window_size=[figsize, figsize])
-    grid = pyvista.UnstructuredGrid(elements, cell_types, nodes)
-    plotter.add_mesh(grid, color=color, lighting=True,
-                     show_edges=False, show_scalar_bar=False)
-
-    plotter.background_color = "white"
-    plotter.view_xy()
-    plotter.show_axes()
-
-    plotter.screenshot(save_path+fig_name, window_size=[figsize, figsize])
-    plotter.close()
-
-    return elements, cell_types, nodes, element_count
+    return final_raster
 
 
 def plot_microstructure_3d(full_mesh, block_lib, block_nodes, names,

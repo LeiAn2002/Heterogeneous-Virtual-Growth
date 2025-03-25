@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from utils.nodes_operations import arc_points, rotate_nodes
-from utils.create_rectangle_mesh import create_rectangle_mesh
-from utils.mesh_operations import process_raw_mesh, coord_transformation
+from blocks.random_block import block_generation
+from utils.rotation_matrix import rotate_thickness_matrix
 
 ALL_BLOCKS = {}
 
@@ -30,7 +29,7 @@ class Block(ABC):
         pass
 
     @abstractmethod
-    def generate_nodes(self, m, thickness_matrix, v, rotation, **kwargs):
+    def generate_block_shape(self, m, thickness_matrix, v, rotation, **kwargs):
         pass
 
     @abstractmethod
@@ -43,169 +42,192 @@ class Block(ABC):
 
 
 @register_block_class
-class CircleBlock2D(Block):
+class CrossBlock2D(Block):
 
-    type_name = "circle"
+    type_name = "cross"
 
-    def __init__(self, m=0.75, v=0.5, rotation=0, discre_number=10):
+    def __init__(self, m=0.75, v_range=[0.4, 0.6], rotation=0, random_radius=0.6, **kwargs):
         self.m = m
-        self.v = v
+        self.v_range = v_range
         self.rotation = rotation
-        self.discre_number = discre_number
+        self.random_radius = random_radius
+        self.vertical_points = np.array([
+            (0, -1),   # bottom boundary
+            (0, -0.9999999),  # garantee perpendicular to the boundary
+
+            (0, 0.9999999),   # top boundary
+            (0, 1)])
+        self.horizontal_points = np.array([
+            (-1, 0),   # left boundary
+            (-0.9999999, 0),
+
+            (0.9999999, 0),   # right boundary
+            (1, 0)])
+        self.outer_basic_points = np.concatenate((self.vertical_points, self.horizontal_points))
+        self.vertical_inner_points = np.array([
+            (0, -1/3),
+            (0, 1/3)
+        ])
+        self.horizontal_inner_points = np.array([
+            (-1/3, 0),
+            (1/3, 0)
+        ])
+        self.inner_basic_points = np.concatenate((self.vertical_inner_points, self.horizontal_inner_points))
+        self.basic_points = np.concatenate((self.outer_basic_points, self.inner_basic_points))
+        self.outer_count = len(self.outer_basic_points)
+
+        self.curve_definitions = [
+            [0, 1, 8, 9, 2, 3],   # bottom->inner->top (vertical)
+            [4, 5, 10, 11, 6, 7],   # left->inner->right (horizontal)
+        ]
+        self.number_of_curves = len(self.curve_definitions)
+        self.number_of_inner_points = len(self.vertical_inner_points)
 
     def get_adjacent_matrix(self, **kwargs):
         adj_matrix = np.array([
             [0, 0, 0, 1, 0, 0, 0],
-            [0, 0, 1, 0, 1, 0, 0],
-            [0, 1, 0, 0, 0, 1, 0],
-            [1, 0, 0, 0, 0, 0, 1],
-            [0, 1, 0, 0, 0, 1, 0],
-            [0, 0, 1, 0, 1, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+            [1, 1, 1, 1, 1, 1, 1],
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
             [0, 0, 0, 1, 0, 0, 0]
         ]).astype(int)
         return adj_matrix
 
     def get_thickness(self, **kwargs):
-        thickness = self.m * self.v
-        thickness_matrix = np.array([
-            [thickness, thickness],
-            [thickness, thickness]
-        ])  # thickness of 4 edges, order: left, bottom, right, top
-        rotated_thickness_matrix = np.roll(thickness_matrix, self.rotation)
+        lower_boundary = self.v_range[0]
+        upper_boundary = self.v_range[1]
+
+        # thickness of 4 edges, order: bottom, top, left, right
+        thickness_matrix = np.random.uniform(lower_boundary, upper_boundary, size=(2, 2))
+        rotated_thickness_matrix = rotate_thickness_matrix(thickness_matrix, self.rotation)
         return rotated_thickness_matrix
 
-    def generate_nodes(self, thickness_matrix, **kwargs):
-        scale = 1 - self.v
-        t = np.roll(thickness_matrix, -self.rotation)  # original thickness_matrix
-        outside_nodes = np.array([
-            [-self.m, -t[0, 0], 0],
-            [-t[0, 1], -self.m, 0],
-            [t[0, 1], -self.m, 0],
-            [self.m, -t[1, 0], 0],
-            [self.m, t[1, 0], 0],
-            [t[1, 1], self.m, 0],
-            [-t[1, 1], self.m, 0],
-            [-self.m, t[0, 0], 0]
-        ])
-        inside_nodes = np.array([
-            [-self.m*scale, -t[0, 0]*scale, 0],
-            [-t[0, 1]*scale, -self.m*scale, 0],
-            [t[0, 1]*scale, -self.m*scale, 0],
-            [self.m*scale, -t[1, 0]*scale, 0],
-            [self.m*scale, t[1, 0]*scale, 0],
-            [t[1, 1]*scale, self.m*scale, 0],
-            [-t[1, 1]*scale, self.m*scale, 0],
-            [-self.m*scale, t[0, 0]*scale, 0]
-        ])
+    def generate_block_shape(self, thickness_matrix, **kwargs):
+        t = rotate_thickness_matrix(thickness_matrix, -self.rotation)  # original thickness_matrix
+        forbidden_edges = np.array([
+                           [(-1, -1, -1, 1),
+                            (1, -1, 1, 1),
+                            (-1, -1, -t[0][0], -1),
+                            (t[0][0], -1, 1, -1),
+                            (-1, 1, -t[0][1], 1),
+                            (t[0][1], 1, 1, 1)],
+                           [(-1, -1, 1, -1),
+                            (-1, 1, 1, 1),
+                            (-1, -1, -1, -t[1][0]),
+                            (-1, t[1][0], -1, 1),
+                            (1, -1, 1, -t[1][1]),
+                            (1, t[1][1], 1, 1)
+                            ]])
+        lower_bound = self.v_range[0]
+        upper_bound = self.v_range[1]
+        middle = np.random.uniform(lower_bound, upper_bound, size=(self.number_of_curves, self.number_of_inner_points))
+        ones_left = np.ones((self.number_of_curves, 2))
+        ones_right = np.ones((self.number_of_curves, 2))
+        vf = np.hstack([ones_left, middle, ones_right])
+        block = block_generation(
+                basic_points=self.basic_points,
+                outer_count=self.outer_count,
+                r=self.random_radius,
+                curve_definitions=self.curve_definitions,
+                vf=vf,
+                forbidden_edges_set=forbidden_edges,
+                r_filter=3,
+            )
 
-        rotated_outside_nodes = rotate_nodes(outside_nodes, self.rotation)
-        rotated_inside_nodes = rotate_nodes(inside_nodes, self.rotation)
-
-        nodes_list = []
-
-        for i in range(4):
-            nodes_list += arc_points(rotated_inside_nodes[2*i, :2], rotated_inside_nodes[2*i+1, :2], self.discre_number)
-
-        for i in range(4):
-            nodes_list += arc_points(rotated_outside_nodes[2*i, :2], rotated_outside_nodes[2*i+1, :2], self.discre_number)
-
-        nodes = np.array(nodes_list).astype(float)
-        return nodes
+        rotated_block = np.rot90(block, self.rotation)
+        return rotated_block
 
     def generate_elements(self, **kwargs):
-        elements = np.array(
-            [[4, i, 4 * self.discre_number + i, 4 * self.discre_number + 1 + i, i + 1] for i in range(4 * self.discre_number - 1)] +
-            [[4, 4 * self.discre_number-1, 8*self.discre_number-1, 4*self.discre_number, 0]]
-        )
-        return elements
+        pass
 
     def generate_mesh(self, thickness_matrix, num_elems_d, **kwargs):
-        all_nodes = []
-        all_elements = []
-        point_sets = self.generate_nodes(self.m, thickness_matrix, self.v, self.rotation)
-        # part 1
-        for i in range(self.discre_number-1):
-            nodes, elements = create_rectangle_mesh(2, 2, num_elems_d, 1)
-            nodes -= 1
-            vx = np.array([point_sets[4*self.discre_number+1+i][0], point_sets[i+1][0], point_sets[i][0], point_sets[4*self.discre_number+i][0]])
-            vy = np.array([point_sets[4*self.discre_number+1+i][1], point_sets[i+1][1], point_sets[i][1], point_sets[4*self.discre_number+i][1]])
-            nodes[:, 0], nodes[:, 1] = coord_transformation(
-                nodes[:, 0], nodes[:, 1], vx, vy)
-            all_nodes.append(nodes)
-            all_elements.append(elements)
+        pass
 
-        special_nodes_1, special_elements_1 = create_rectangle_mesh(2, 2, num_elems_d, num_elems_d)
-        special_nodes_1 -= 1
-        vx = np.array([point_sets[5*self.discre_number][0], point_sets[self.discre_number][0], point_sets[self.discre_number-1][0], point_sets[5*self.discre_number-1][0]])
-        vy = np.array([point_sets[5*self.discre_number][1], point_sets[self.discre_number][1], point_sets[self.discre_number-1][1], point_sets[5*self.discre_number-1][1]])
-        special_nodes_1[:, 0], special_nodes_1[:, 1] = coord_transformation(
-            special_nodes_1[:, 0], special_nodes_1[:, 1], vx, vy)
-        all_nodes.append(special_nodes_1)
-        all_elements.append(special_elements_1)
 
-        # part 2
-        for i in range(self.discre_number, 2*self.discre_number-1):
-            nodes, elements = create_rectangle_mesh(2, 2, num_elems_d, 1)
-            nodes -= 1
-            vx = np.array([point_sets[4*self.discre_number+1+i][0], point_sets[i+1][0], point_sets[i][0], point_sets[4*self.discre_number+i][0]])
-            vy = np.array([point_sets[4*self.discre_number+1+i][1], point_sets[i+1][1], point_sets[i][1], point_sets[4*self.discre_number+i][1]])
-            nodes[:, 0], nodes[:, 1] = coord_transformation(
-                nodes[:, 0], nodes[:, 1], vx, vy)
-            all_nodes.append(nodes)
-            all_elements.append(elements)
+@register_block_class
+class LBlock2D(Block):
 
-        special_nodes_2, special_elements_2 = create_rectangle_mesh(2, 2, num_elems_d, num_elems_d)
-        special_nodes_2 -= 1
-        vx = np.array([point_sets[6*self.discre_number][0], point_sets[2*self.discre_number][0], point_sets[2*self.discre_number-1][0], point_sets[6*self.discre_number-1][0]])
-        vy = np.array([point_sets[6*self.discre_number][1], point_sets[2*self.discre_number][1], point_sets[2*self.discre_number-1][1], point_sets[6*self.discre_number-1][1]])
-        special_nodes_2[:, 0], special_nodes_2[:, 1] = coord_transformation(
-            special_nodes_2[:, 0], special_nodes_2[:, 1], vx, vy)
-        all_nodes.append(special_nodes_2)
-        all_elements.append(special_elements_2)
+    type_name = "L"
 
-        # part 3
-        for i in range(2*self.discre_number, 3*self.discre_number-1):
-            nodes, elements = create_rectangle_mesh(2, 2, num_elems_d, 1)
-            nodes -= 1
-            vx = np.array([point_sets[4*self.discre_number+1+i][0], point_sets[i+1][0], point_sets[i][0], point_sets[4*self.discre_number+i][0]])
-            vy = np.array([point_sets[4*self.discre_number+1+i][1], point_sets[i+1][1], point_sets[i][1], point_sets[4*self.discre_number+i][1]])
-            nodes[:, 0], nodes[:, 1] = coord_transformation(
-                nodes[:, 0], nodes[:, 1], vx, vy)
-            all_nodes.append(nodes)
-            all_elements.append(elements)
+    def __init__(self, m=0.75, v_range=[0.4, 0.6], rotation=0, random_radius=0.6, **kwargs):
+        self.m = m
+        self.v_range = v_range
+        self.rotation = rotation
+        self.random_radius = random_radius
+        self.outer_basic_points = np.array([
+            (0, 1),   # left boundary
+            (0, 0.99999999),
+            
+            (0.9999999, 0),   # right boundary
+            (1, 0),
+        ])
+        self.inner_basic_points = np.array([
+            (0, 0.5),
+            (0.5, 0)
+        ])
+        self.basic_points = np.concatenate((self.outer_basic_points, self.inner_basic_points))
+        self.outer_count = len(self.outer_basic_points)
 
-        special_nodes_3, special_elements_3 = create_rectangle_mesh(2, 2, num_elems_d, num_elems_d)
-        special_nodes_3 -= 1
-        vx = np.array([point_sets[7*self.discre_number][0], point_sets[3*self.discre_number][0], point_sets[3*self.discre_number-1][0], point_sets[7*self.discre_number-1][0]])
-        vy = np.array([point_sets[7*self.discre_number][1], point_sets[3*self.discre_number][1], point_sets[3*self.discre_number-1][1], point_sets[7*self.discre_number-1][1]])
-        special_nodes_3[:, 0], special_nodes_3[:, 1] = coord_transformation(
-            special_nodes_3[:, 0], special_nodes_3[:, 1], vx, vy)
-        all_nodes.append(special_nodes_3)
-        all_elements.append(special_elements_3)
+        self.curve_definitions = [[0, 1, 4, 5, 2, 3]]  # top->inner->right
+        self.number_of_curves = len(self.curve_definitions)
+        self.number_of_inner_points = len(self.inner_basic_points)
 
-        # part 4
-        for i in range(3*self.discre_number, 4*self.discre_number-1):
-            nodes, elements = create_rectangle_mesh(2, 2, num_elems_d, 1)
-            nodes -= 1
-            vx = np.array([point_sets[4*self.discre_number+1+i][0], point_sets[i+1][0], point_sets[i][0], point_sets[4*self.discre_number+i][0]])
-            vy = np.array([point_sets[4*self.discre_number+1+i][1], point_sets[i+1][1], point_sets[i][1], point_sets[4*self.discre_number+i][1]])
-            nodes[:, 0], nodes[:, 1] = coord_transformation(
-                nodes[:, 0], nodes[:, 1], vx, vy)
-            all_nodes.append(nodes)
-            all_elements.append(elements)
+    def get_adjacent_matrix(self, **kwargs):
+        adj_matrix = np.array([
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0]
+        ]).astype(int)
+        return adj_matrix
 
-        special_nodes_4, special_elements_4 = create_rectangle_mesh(2, 2, num_elems_d, num_elems_d)
-        special_nodes_4 -= 1
-        vx = np.array([point_sets[4*self.discre_number][0], point_sets[0][0], point_sets[4*self.discre_number-1][0], point_sets[8*self.discre_number-1][0]])
-        vy = np.array([point_sets[4*self.discre_number][1], point_sets[0][1], point_sets[4*self.discre_number-1][1], point_sets[8*self.discre_number-1][1]])
-        special_nodes_4[:, 0], special_nodes_4[:, 1] = coord_transformation(
-            special_nodes_4[:, 0], special_nodes_4[:, 1], vx, vy)
-        all_nodes.append(special_nodes_4)
-        all_elements.append(special_elements_4)
+    def get_thickness(self, **kwargs):
+        lower_boundary = self.v_range[0]
+        upper_boundary = self.v_range[1]
 
-        elements, cell_types, nodes = process_raw_mesh(
-            all_nodes, all_elements)
-        return elements, cell_types, nodes
+        # thickness of 4 edges, order: bottom, top, left, right
+        thickness_matrix = np.array([[0, np.random.uniform(lower_boundary, upper_boundary)], [0, np.random.uniform(lower_boundary, upper_boundary)]])
+        rotated_thickness_matrix = rotate_thickness_matrix(thickness_matrix, self.rotation)
+        return rotated_thickness_matrix
+
+    def generate_block_shape(self, thickness_matrix, **kwargs):
+        t = rotate_thickness_matrix(thickness_matrix, -self.rotation)  # original thickness_matrix
+        forbidden_edges = np.array([
+                           [(-1, -1, -1, 1),
+                            (-1, -1, 1, -1),
+                            (-1, 1, -t[0][1], 1),
+                            (t[0][1], 1, 1, 1),
+                            (1, -1, 1, -t[1][1]),
+                            (1, t[1][1], 1, 1)]])
+        lower_bound = self.v_range[0]
+        upper_bound = self.v_range[1]
+        middle = np.random.uniform(lower_bound, upper_bound, size=(self.number_of_curves, self.number_of_inner_points))
+        ones_left = np.ones((self.number_of_curves, 2))
+        ones_right = np.ones((self.number_of_curves, 2))
+        vf = np.hstack([ones_left, middle, ones_right])
+        block = block_generation(
+                basic_points=self.basic_points,
+                outer_count=self.outer_count,
+                r=self.random_radius,
+                curve_definitions=self.curve_definitions,
+                vf=vf,
+                forbidden_edges_set=forbidden_edges,
+                r_filter=3,
+            )
+
+        block = np.rot90(block, self.rotation, axes=(0, 1))
+        return block
+
+    def generate_elements(self, **kwargs):
+        pass
+
+    def generate_mesh(self, thickness_matrix, num_elems_d, **kwargs):
+        pass
 
 
 class BlockLibrary:
