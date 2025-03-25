@@ -138,7 +138,7 @@ def point_to_segment_distance(px, py, x1, y1, x2, y2):
     return np.linalg.norm(np.array([px, py]) - nearest)
 
 
-def generate_random_control_points(basic_points, r, outer_count):
+def generate_random_control_points(basic_points, r, outer_count, forbidden_edges_set, curve_definitions):
     """
     Generate control points for each basic point.
     - The first 'outer_count' points are considered 'outer/pinned' and will NOT be randomized.
@@ -151,8 +151,17 @@ def generate_random_control_points(basic_points, r, outer_count):
             # Keep outer points fixed
             cx, cy = bx, by
         else:
+            index = 0
+            for row_index, row in enumerate(curve_definitions):
+                if i in row:
+                    index = row_index
+            min_dist = min(
+                point_to_segment_distance(bx, by, *edge)
+                for edge in forbidden_edges_set[index]
+            )
+            random_radius = min(r, min_dist)
             # Randomize inner points within a circle of radius r
-            rr = random.uniform(0, r)
+            rr = random.uniform(0, random_radius)
             angle = random.uniform(0, 2*np.pi)
             cx = bx + rr * np.cos(angle)
             cy = by + rr * np.sin(angle)
@@ -160,7 +169,7 @@ def generate_random_control_points(basic_points, r, outer_count):
     return control_points
 
 
-def generate_bspline_curve(points, num_samples=200):
+def generate_bspline_curve(points, num_samples=500):
     """
     Create a cubic B-spline curve using scipy's make_interp_spline.
     Note: If the number of points is < 4, we adjust k accordingly to avoid errors.
@@ -249,7 +258,7 @@ def block_generation(
     3. Thicken each curve with 'thickness'.
     """
     # 1. Generate control points
-    control_points = generate_random_control_points(basic_points, r, outer_count)
+    control_points = generate_random_control_points(basic_points, r, outer_count, forbidden_edges_set, curve_definitions)
     
     # 2. Build and thicken each sub-curve
     shapes = []
@@ -336,15 +345,15 @@ def block_generation(
 #     # This helps keep the tangent near vertical/horizontal at edges.
 #     outer_basic_points = [
 #         (0, -1),   # bottom boundary
-#         (0, -0.9999999),
+#         (0, -0.9),
 
-#         (0, 0.9999999),   # top boundary
+#         (0, 0.9),   # top boundary
 #         (0, 1),
 
 #         (-1, 0),   # left boundary
-#         (-0.9999999, 0),
+#         (-0.9, 0),
 
-#         (0.9999999, 0),   # right boundary
+#         (0.9, 0),   # right boundary
 #         (1, 0),
 #     ]
 
@@ -418,7 +427,7 @@ def block_generation(
 
 # if __name__ == "__main__":
 #     start_time = time.time()
-#     r_filter = 5
+#     r_filter = 8
 #     radius = 0.8
 #     lower_boundary_vf = [[0.4, 0.4], [0.4, 0.4]]
 #     upper_boundary_vf = [[0.6, 0.6], [0.6, 0.6]]
