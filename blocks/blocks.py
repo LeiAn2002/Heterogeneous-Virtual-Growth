@@ -133,7 +133,7 @@ class CrossBlock2D(Block):
                 curve_definitions=self.curve_definitions,
                 vf=vf,
                 forbidden_edges_set=forbidden_edges,
-                r_filter=8,
+                r_filter=2,
             )
 
         rotated_block = np.rot90(block, self.rotation)
@@ -217,7 +217,7 @@ class LBlock2D(Block):
                 curve_definitions=self.curve_definitions,
                 vf=vf,
                 forbidden_edges_set=forbidden_edges,
-                r_filter=8,
+                r_filter=2,
             )
 
         block = np.rot90(block, self.rotation, axes=(0, 1))
