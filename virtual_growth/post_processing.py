@@ -24,6 +24,7 @@ import numpy as np
 import pyvista
 import matplotlib.pyplot as plt
 from blocks.random_block import linear_filter, heaviside
+from matplotlib.colors import ListedColormap
 
 from utils.remove_repeated_nodes import remove_repeated_nodes
 
@@ -47,7 +48,6 @@ def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
 def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
                            v_array, r_array, solid=[], void=[], color="#96ADFC",
                            save_path="", fig_name="microstructure.jpg"):
-    block_size = 2 * m
     rows, cols = full_mesh.shape
 
     k = 0
@@ -66,7 +66,6 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             block_class = block_library.create_block(parent, m, v_range, rotation, random_radius)
             thickness_matrices[y, x] = block_class.get_thickness()
             k += 1
-    # print(thickness_matrices)
 
     # get the connectivity-ganranteeing thickness matrices
     for y in range(full_mesh.shape[0]):
@@ -84,6 +83,9 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
     final_height = rows * block_size
     final_width = cols * block_size
     final_raster = np.zeros((final_height, final_width), dtype=np.uint8)
+    color_label_matrix = np.ones((rows, cols))
+    block_name_to_label = {}
+    next_label = 1
 
     k = 0
     for y in range(full_mesh.shape[0]):
@@ -95,21 +97,42 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             elem_id = all_elems[k]
             v_range = v_array[elem_id]
             random_radius = r_array[elem_id]
+
+            if parent not in block_name_to_label:
+                block_name_to_label[parent] = next_label
+                next_label += 1
+            label_id = block_name_to_label[parent]
+
             block_class = block_library.create_block(parent, m, v_range, rotation, random_radius)
             block_matrix = block_class.generate_block_shape(thickness_matrices[y, x])
             top = y * block_size
             left = x * block_size
-            final_raster[top:top+block_size, left:left+block_size] = np.maximum(
-                final_raster[top:top+block_size, left:left+block_size],
-                block_matrix
-            )
+            final_raster[top:top+block_size, left:left+block_size] = block_matrix
+
+            color_label_matrix[y, x] = label_id
             k += 1
     final_raster = linear_filter(final_raster, 3)
     final_raster = heaviside(final_raster, 128)
 
+    for y in range(full_mesh.shape[0]):
+        for x in range(full_mesh.shape[1]):
+            top = y * block_size
+            left = x * block_size
+            label_id = color_label_matrix[y, x]
+            final_raster[top:top+block_size, left:left+block_size] *= label_id
+
+    num_labels = next_label  # 1..(next_label-1) are real block labels
+    color_list = []
+    color_list.append([1, 1, 1])  # background => white
+    palette = plt.cm.get_cmap("Set2", num_labels)
+    for i in range(num_labels):
+        color_list.append(palette(i))
+
+    cmap = ListedColormap(color_list)
+
     plt.figure(figsize=(8, 8))
     plt.axis("off")
-    plt.imshow(final_raster, cmap="gray_r", origin="upper")
+    plt.imshow(final_raster, cmap=cmap, origin="upper")
     # plt.colorbar()
     # plt.title("Microstructure 2D Binary Raster")
     if save_path:
