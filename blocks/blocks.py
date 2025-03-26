@@ -136,8 +136,9 @@ class CrossBlock2D(Block):
                 r_filter=2,
             )
 
-        rotated_block = np.rot90(block, self.rotation)
-        return rotated_block
+        block = np.rot90(block, self.rotation)
+        block = block
+        return block
 
     def generate_elements(self, **kwargs):
         pass
@@ -221,6 +222,7 @@ class LBlock2D(Block):
             )
 
         block = np.rot90(block, self.rotation, axes=(0, 1))
+        block = block
         return block
 
     def generate_elements(self, **kwargs):

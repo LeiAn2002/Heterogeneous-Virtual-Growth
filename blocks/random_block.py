@@ -138,7 +138,7 @@ def point_to_segment_distance(px, py, x1, y1, x2, y2):
     return np.linalg.norm(np.array([px, py]) - nearest)
 
 
-def generate_random_control_points(basic_points, r, outer_count, forbidden_edges_set, curve_definitions):
+def generate_random_control_points(basic_points, r, outer_count):
     """
     Generate control points for each basic point.
     - The first 'outer_count' points are considered 'outer/pinned' and will NOT be randomized.
@@ -151,20 +151,14 @@ def generate_random_control_points(basic_points, r, outer_count, forbidden_edges
             # Keep outer points fixed
             cx, cy = bx, by
         else:
-            index = 0
-            for row_index, row in enumerate(curve_definitions):
-                if i in row:
-                    index = row_index
-            min_dist = min(
-                point_to_segment_distance(bx, by, *edge)
-                for edge in forbidden_edges_set[index]
-            )
-            random_radius = min(r, min_dist)
             # Randomize inner points within a circle of radius r
-            rr = random.uniform(0, random_radius)
-            angle = random.uniform(0, 2*np.pi)
-            cx = bx + rr * np.cos(angle)
-            cy = by + rr * np.sin(angle)
+            while True:
+                rr = random.uniform(0, r)
+                angle = random.uniform(0, 2 * np.pi)
+                cx = bx + rr * np.cos(angle)
+                cy = by + rr * np.sin(angle)
+                if abs(cx) <= 0.8 and abs(cy) <= 0.8:
+                    break
         control_points.append((cx, cy))
     return control_points
 
@@ -258,7 +252,7 @@ def block_generation(
     3. Thicken each curve with 'thickness'.
     """
     # 1. Generate control points
-    control_points = generate_random_control_points(basic_points, r, outer_count, forbidden_edges_set, curve_definitions)
+    control_points = generate_random_control_points(basic_points, r, outer_count)
     
     # 2. Build and thicken each sub-curve
     shapes = []
