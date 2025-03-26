@@ -296,7 +296,6 @@ def block_generation(
     # y_box = [ymin, ymax, ymax, ymin, ymin]
     # ax.plot(x_box, y_box, color='black', lw=1)
 
-    # Plot the clipped shape
     if final_shape.geom_type == 'Polygon':
         x_ext, y_ext = final_shape.exterior.xy
         ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
@@ -320,15 +319,15 @@ def block_generation(
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=20)
-    plt.savefig("Origin.png", bbox_inches='tight', pad_inches=0, dpi=20)
+    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=10)
+    # plt.savefig("Origin.png", bbox_inches='tight', pad_inches=0, dpi=10)
     plt.close()
 
     mask = image_to_mask_array(buf)
 
     mask = linear_filter(mask, r_filter)
 
-    mask = heaviside(mask, beta=128)
+    mask = heaviside(mask, beta=256)
 
     return mask
 
@@ -427,8 +426,8 @@ def block_generation(
 
 # if __name__ == "__main__":
 #     start_time = time.time()
-#     r_filter = 8
-#     radius = 0.8
+#     r_filter = 2
+#     radius = 0.7
 #     lower_boundary_vf = [[0.4, 0.4], [0.4, 0.4]]
 #     upper_boundary_vf = [[0.6, 0.6], [0.6, 0.6]]
 #     # Randomly choose boundary values between lower and upper bounds
