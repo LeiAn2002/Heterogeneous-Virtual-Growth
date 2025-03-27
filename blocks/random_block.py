@@ -157,7 +157,7 @@ def generate_random_control_points(basic_points, r, outer_count):
                 angle = random.uniform(0, 2 * np.pi)
                 cx = bx + rr * np.cos(angle)
                 cy = by + rr * np.sin(angle)
-                if abs(cx) <= 0.8 and abs(cy) <= 0.8:
+                if abs(cx) <= 0.8 and abs(cy) <= 0.8 and abs(cx) + abs(cy) < 1.2:
                     break
         control_points.append((cx, cy))
     return control_points
