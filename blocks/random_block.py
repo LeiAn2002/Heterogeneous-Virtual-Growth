@@ -8,6 +8,7 @@ from shapely.geometry import LineString
 from shapely.ops import unary_union
 from scipy.interpolate import make_interp_spline
 from scipy.sparse import coo_matrix
+from scipy.ndimage import binary_fill_holes
 from PIL import Image
 
 
@@ -322,6 +323,8 @@ def block_generation(
     mask = linear_filter(mask, r_filter)
 
     mask = heaviside(mask, beta=256)
+
+    mask = binary_fill_holes(mask)
 
     return mask
 
