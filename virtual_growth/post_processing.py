@@ -111,7 +111,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
 
             color_label_matrix[y, x] = label_id
             k += 1
-    final_raster = linear_filter(final_raster, 3)
+    final_raster = linear_filter(final_raster, 4)
     final_raster = heaviside(final_raster, 128)
 
     for y in range(full_mesh.shape[0]):
