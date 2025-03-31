@@ -96,7 +96,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
                     avg = (periodic_thickness_matrices[y, x, 0, 0] + periodic_thickness_matrices[y + 1, x, 0, 1]) / 2
                     periodic_thickness_matrices[y, x, 0, 0] = avg
                     periodic_thickness_matrices[y + 1, x, 0, 1] = avg
-        thickness_matrices = periodic_thickness_matrices[1:-1, 1:-1, :, :]
+        thickness_matrices = periodic_thickness_matrices[1:-1, 1:-1]
 
     else:
         # get the connectivity-ganranteeing thickness matrices
@@ -151,7 +151,8 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             top = y * block_size
             left = x * block_size
             label_id = color_label_matrix[y, x]
-            final_raster[top:top+block_size, left:left+block_size] *= label_id
+            colored_final_raster = final_raster.copy()
+            colored_final_raster[top:top+block_size, left:left+block_size] *= label_id
 
     num_labels = next_label  # 1..(next_label-1) are real block labels
     color_list = []
@@ -164,7 +165,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
 
     plt.figure(figsize=(8, 8))
     plt.axis("off")
-    plt.imshow(final_raster, cmap=cmap, origin="upper")
+    plt.imshow(colored_final_raster, cmap=cmap, origin="upper")
     # plt.colorbar()
     # plt.title("Microstructure 2D Binary Raster")
     if save_path:
