@@ -65,12 +65,12 @@ class CrossBlock2D(Block):
             (1, 0)])
         self.outer_basic_points = np.concatenate((self.vertical_points, self.horizontal_points))
         self.vertical_inner_points = np.array([
-            (0, -1/2),
-            (0, 1/2)
+            (0, -1/3),
+            (0, 1/3)
         ])
         self.horizontal_inner_points = np.array([
-            (-1/2, 0),
-            (1/2, 0)
+            (-1/3, 0),
+            (1/3, 0)
         ])
         self.inner_basic_points = np.concatenate((self.vertical_inner_points, self.horizontal_inner_points))
         self.basic_points = np.concatenate((self.outer_basic_points, self.inner_basic_points))

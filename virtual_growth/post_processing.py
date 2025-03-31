@@ -45,8 +45,23 @@ def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
     return frequency
 
 
+def periodic_boundary(A):
+    m, n = A.shape[0], A.shape[1]
+    B = np.zeros((m + 2, n + 2, 2, 2))
+
+    B[1:-1, 1:-1, :, :] = A
+
+    # periodic boundary conditions
+    B[0, 1:-1, :, :] = A[-1, :, :, :]
+    B[-1, 1:-1, :, :] = A[0, :, :, :]
+    B[1:-1, 0, :, :] = A[:, -1, :, :]
+    B[1:-1, -1, :, :] = A[:, 0, :, :]
+
+    return B
+
+
 def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
-                           v_array, r_array, solid=[], void=[], color="#96ADFC",
+                           v_array, r_array, periodic, solid=[], void=[], color="#96ADFC",
                            save_path="", fig_name="microstructure.jpg"):
     rows, cols = full_mesh.shape
 
@@ -67,17 +82,34 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             thickness_matrices[y, x] = block_class.get_thickness()
             k += 1
 
-    # get the connectivity-ganranteeing thickness matrices
-    for y in range(full_mesh.shape[0]):
-        for x in range(full_mesh.shape[1]):
-            if x < full_mesh.shape[1] - 1:
-                avg = (thickness_matrices[y, x, 1, 1] + thickness_matrices[y, x + 1, 1, 0]) / 2
-                thickness_matrices[y, x, 1, 1] = avg
-                thickness_matrices[y, x + 1, 1, 0] = avg
-            if y < full_mesh.shape[0] - 1:
-                avg = (thickness_matrices[y, x, 0, 0] + thickness_matrices[y + 1, x, 0, 1]) / 2
-                thickness_matrices[y, x, 0, 0] = avg
-                thickness_matrices[y + 1, x, 0, 1] = avg
+    if periodic:
+        # get the connectivity-ganranteeing thickness matrices under periodic boundary conditions
+        periodic_thickness_matrices = periodic_boundary(thickness_matrices)
+        rows_periodic_matrix, cols_periodic_matrix = periodic_thickness_matrices.shape[0], periodic_thickness_matrices.shape[1]
+        for y in range(rows_periodic_matrix):
+            for x in range(cols_periodic_matrix):
+                if x < cols_periodic_matrix - 1:
+                    avg = (periodic_thickness_matrices[y, x, 1, 1] + periodic_thickness_matrices[y, x + 1, 1, 0]) / 2
+                    periodic_thickness_matrices[y, x, 1, 1] = avg
+                    periodic_thickness_matrices[y, x + 1, 1, 0] = avg
+                if y < rows_periodic_matrix - 1:
+                    avg = (periodic_thickness_matrices[y, x, 0, 0] + periodic_thickness_matrices[y + 1, x, 0, 1]) / 2
+                    periodic_thickness_matrices[y, x, 0, 0] = avg
+                    periodic_thickness_matrices[y + 1, x, 0, 1] = avg
+        thickness_matrices = periodic_thickness_matrices[1:-1, 1:-1, :, :]
+
+    else:
+        # get the connectivity-ganranteeing thickness matrices
+        for y in range(thickness_matrices.shape[0]):
+            for x in range(thickness_matrices.shape[1]):
+                if x < full_mesh.shape[1] - 1:
+                    avg = (thickness_matrices[y, x, 1, 1] + thickness_matrices[y, x + 1, 1, 0]) / 2
+                    thickness_matrices[y, x, 1, 1] = avg
+                    thickness_matrices[y, x + 1, 1, 0] = avg
+                if y < full_mesh.shape[0] - 1:
+                    avg = (thickness_matrices[y, x, 0, 0] + thickness_matrices[y + 1, x, 0, 1]) / 2
+                    thickness_matrices[y, x, 0, 0] = avg
+                    thickness_matrices[y + 1, x, 0, 1] = avg
 
     block_size = 36
     final_height = rows * block_size
