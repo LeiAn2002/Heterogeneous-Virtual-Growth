@@ -28,7 +28,7 @@ match dim:
     case 2:
         mesh_size = (6, 6)
         element_size = (2, 2)
-        candidates = ["cross", "L"]
+        candidates = ["cross", "T"]
         num_elems = np.prod(mesh_size)
         frequency_hints = np.random.rand(num_elems, len(candidates))
         frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
@@ -60,7 +60,7 @@ match dim:
         save_path = "designs/2d/"
         fig_name = "symbolic_graph.jpg"
         gif_name = "symbolic_graph.gif"
-        block_names = ["cross", "L"]
+        block_names = ["cross", "T"]
 
     case 3:
         mesh_size = (1, 1, 1)
