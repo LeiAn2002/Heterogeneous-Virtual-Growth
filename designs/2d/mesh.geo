@@ -1,7 +1,7 @@
 // Gmsh geometry with bounding-box outer boundary + holes + PERIODIC
 SetFactory("OpenCASCADE");
 
-Point(1) = {-1e-05, 1e-05, 0, 50.0};
+Mesh.RecombineAll = 1;Point(1) = {-1e-05, 1e-05, 0, 50.0};
 Point(2) = {431.00001, 1e-05, 0, 50.0};
 Point(3) = {431.00001, -431.00001, 0, 50.0};
 Point(4) = {-1e-05, -431.00001, 0, 50.0};

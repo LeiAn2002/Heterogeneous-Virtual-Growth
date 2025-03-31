@@ -131,6 +131,7 @@ def write_geo_file_with_bounding_box(
     with open(geo_filename, 'w') as f:
         f.write('// Gmsh geometry with bounding-box outer boundary + holes + PERIODIC\n')
         f.write('SetFactory("OpenCASCADE");\n\n')
+        f.write('Mesh.RecombineAll = 1;')
 
         point_id = 1
         line_id = 1
