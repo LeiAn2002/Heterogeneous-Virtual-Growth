@@ -27,7 +27,7 @@ dim = 2
 match dim:
     case 2:
         mesh_size = (6, 6)
-        element_size = (4, 4)
+        element_size = (2, 2)
         candidates = ["cross", "T"]
         num_elems = np.prod(mesh_size)
         frequency_hints = np.random.rand(num_elems, len(candidates))
@@ -36,7 +36,7 @@ match dim:
         # r_array = np.array([0.0, 0.0, 0.0, 0.0])
         # v_array = np.array([0.2, 0.2, 0.2, 0.2])
 
-        first_row_v = np.linspace(0.25, 0.75, 6)
+        first_row_v = np.linspace(0.4, 0.6, 6)
         v_array = np.tile(first_row_v, (6, 1))
         a = v_array
         b = np.hstack([v_array[:, 1:], v_array[:, -1:]])
@@ -51,8 +51,8 @@ match dim:
         # frequency_hints = np.vstack([flattened, second_third_row])
         # frequency_hints = frequency_hints.T
 
-        first_row_4 = np.linspace(0.7, 0, 6)
-        r_array = np.tile(first_row_4, (6, 1))
+        first_row_r = np.linspace(1.0, 0, 6)
+        r_array = np.tile(first_row_r, (6, 1))
         r_array = r_array.flatten()
 
         # d, m, n = 0.5, 0.75, 0.25

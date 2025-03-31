@@ -188,6 +188,7 @@ class VirtualGrowthEngine:
             m,
             v_array,
             r_array,
+            periodic,
             full_mesh,
             block_count,
             aug_candidates,
@@ -379,6 +380,7 @@ class VirtualGrowthEngine:
         m,
         v_array,
         r_array,
+        periodic,
         full_mesh,
         block_count,
         aug_candidates,
@@ -422,14 +424,14 @@ class VirtualGrowthEngine:
         # Decode the mesh
         idx = full_mesh.flatten().astype(int)
         full_mesh = self.names[idx].reshape(full_mesh.shape)
-        if save_mesh:
-            np.save(save_mesh_path + save_mesh_name, full_mesh)
 
         # If you want to produce figures or GIF, call plot functions
         if make_figure:
             # Example 2D call:
             final_raster = plot_microstructure_2d(
-                m, full_mesh, self.all_elems, self.block_library, v_array, r_array, color=color, save_path=save_path, fig_name=fig_name)
+                m, full_mesh, self.all_elems, self.block_library, v_array, r_array, periodic, color=color, save_path=save_path, fig_name=fig_name)
+        if save_mesh:
+            np.save(save_mesh_path + save_mesh_name, final_raster)
 
         if make_gif:
             plot_microstructure_gif()  # 需要修改！！！！！
