@@ -4,7 +4,6 @@ import cv2
 import meshio
 import numpy as np
 
-
 def bin_array_to_cv2(bin_array, invert=False):
     """
     Convert a 2D numpy array of 0/1 to a 0/255 uint8 image for OpenCV.
@@ -27,12 +26,6 @@ def bin_array_to_cv2(bin_array, invert=False):
     return bin_img
 
 
-design_path = "designs/2d/symbolic_graph.npy"
-debug_prefix = "designs/2d/mesh_debug/"
-design_matrix = np.load(design_path)
-bin_img = bin_array_to_cv2(design_matrix, invert=True)
-
-
 def find_contours_hierarchy(bin_img):
     """
     Use OpenCV to find contours with full hierarchy info (RETR_TREE).
@@ -44,6 +37,9 @@ def find_contours_hierarchy(bin_img):
         contours (list): A list of contour arrays.
         hierarchy (np.ndarray): A (1, N, 4) array describing each contour's relations.
     """
+    kernel = np.ones((2, 2), np.uint8)
+    bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel, iterations=1)
+    bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel, iterations=1)
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     # debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
     # cv2.drawContours(debug_img, contours, -1, (0,0,255), 2)
@@ -99,14 +95,14 @@ def write_geo_file_with_bounding_box(
     """
     Write a Gmsh .geo file (Plan #1: one bounding rectangle as outer boundary, 
     plus holes). Then add Periodic lines for left-right and bottom-top edges.
-    
+
     We'll force the rectangle edges to be lines:
        l1 = bottom, l2 = right, l3 = top, l4 = left
     so we can do:
        Periodic Line{l2} = {l4};  // right = left
        Periodic Line{l3} = {l1};  // top   = bottom
        Coherence;
-    
+
     Args:
         contours (list): List of hole contours from cv2.findContours ( Nx1x2 points each ).
         geo_filename (str): Output .geo file path.
@@ -130,23 +126,23 @@ def write_geo_file_with_bounding_box(
     max_x += margin
     min_y -= margin
     max_y += margin
-    
+
     # 2) Open .geo file
     with open(geo_filename, 'w') as f:
         f.write('// Gmsh geometry with bounding-box outer boundary + holes + PERIODIC\n')
         f.write('SetFactory("OpenCASCADE");\n\n')
-        
+
         point_id = 1
         line_id = 1
         loop_id = 1
-        
+
         # We'll store hole loops in hole_loop_ids
         hole_loop_ids = []
-        
+
         # Helper to flip y
         def flipy(val):
             return -val if flip_y else val
-        
+
         # ---------------------------------------------------------
         # (A) Define bounding rectangle:
         #     p1->p2 (Line l1) = bottom
@@ -158,7 +154,7 @@ def write_geo_file_with_bounding_box(
         p2 = (max_x, min_y)
         p3 = (max_x, max_y)
         p4 = (min_x, max_y)
-        
+
         # Write rectangle points
         f.write(f'Point({point_id}) = {{{p1[0]}, {flipy(p1[1])}, 0, {lc}}};\n')
         id_p1 = point_id; point_id += 1
@@ -168,30 +164,30 @@ def write_geo_file_with_bounding_box(
         id_p3 = point_id; point_id += 1
         f.write(f'Point({point_id}) = {{{p4[0]}, {flipy(p4[1])}, 0, {lc}}};\n')
         id_p4 = point_id; point_id += 1
-        
+
         # Lines
         # l1: bottom, l2: right, l3: top, l4: left
         f.write(f'Line({line_id}) = {{{id_p1}, {id_p2}}};\n')  # bottom
         l1 = line_id
         line_id += 1
-        
+
         f.write(f'Line({line_id}) = {{{id_p2}, {id_p3}}};\n')  # right
         l2 = line_id
         line_id += 1
-        
+
         f.write(f'Line({line_id}) = {{{id_p3}, {id_p4}}};\n')  # top
         l3 = line_id
         line_id += 1
-        
+
         f.write(f'Line({line_id}) = {{{id_p4}, {id_p1}}};\n')  # left
         l4 = line_id
         line_id += 1
-        
+
         # Outer loop
         f.write(f'Curve Loop({loop_id}) = {{{l1},{l2},{l3},{l4}}};\n')
         outer_loop_id = loop_id
         loop_id += 1
-        
+
         # ---------------------------------------------------------
         # (B) Holes: each contour => lines => hole loop
         # ---------------------------------------------------------
@@ -205,7 +201,7 @@ def write_geo_file_with_bounding_box(
                 f.write(f'Point({point_id}) = {{{xj},{yj},0,{lc}}};\n')
                 contour_pts.append(point_id)
                 point_id += 1
-            
+
             start_line = line_id
             for j in range(n_pts):
                 pA = contour_pts[j]
@@ -213,13 +209,13 @@ def write_geo_file_with_bounding_box(
                 f.write(f'Line({line_id}) = {{{pA},{pB}}};\n')
                 line_id += 1
             end_line = line_id - 1
-            
+
             current_loop_id = loop_id
             lines_str = ",".join(str(lid) for lid in range(start_line, end_line+1))
             f.write(f'Curve Loop({current_loop_id}) = {{{lines_str}}};\n')
             hole_loop_ids.append(current_loop_id)
             loop_id += 1
-        
+
         # ---------------------------------------------------------
         # (C) Single plane surface => outer_loop + holes
         # ---------------------------------------------------------
@@ -229,7 +225,7 @@ def write_geo_file_with_bounding_box(
             f.write(f'Plane Surface({plane_surface_id}) = {{{outer_loop_id},{hole_str}}};\n')
         else:
             f.write(f'Plane Surface({plane_surface_id}) = {{{outer_loop_id}}};\n')
-        
+
         # ---------------------------------------------------------
         # (D) Add PERIODIC for lines: l2=right, l4=left, l3=top, l1=bottom
         #     => we want left-right periodic, top-bottom periodic
@@ -240,13 +236,13 @@ def write_geo_file_with_bounding_box(
         #    Make sure your geometry REALLY matches l2-l4 horizontally, l1-l3 vertically
         #    i.e. the bounding box is perfect rectangle. 
         # ---------------------------------------------------------
-        
+ 
         f.write(f"Periodic Line{{{l2}}} = {{{l4}}};\n")  # right = left
         f.write(f"Periodic Line{{{l3}}} = {{{l1}}};\n")  # top   = bottom
         f.write("Coherence;\n")
-        
+  
         f.write('// end .geo\n')
-    
+
     print(f"[+] Wrote periodic .geo => {geo_filename}")
 
 
@@ -259,19 +255,6 @@ def run_gmsh(geo_file, msh_file="/design/2d/fem_mesh.msh", dim=2):
     print("[Cmd]", " ".join(cmd))
     subprocess.run(cmd, check=True)
     print(f"[+] Generated mesh file with periodic edges => {msh_file}")
-
-
-contours, hierarchy = find_contours_hierarchy(bin_img)
-simplified_contours = simplify_contours(contours, epsilon_ratio=0.01)
-geo_file = debug_prefix + "output.geo"
-write_geo_file_with_bounding_box(
-    simplified_contours,
-    geo_filename=geo_file,
-    lc=5.0,
-    flip_y=True,
-    margin=1e-5
-)
-run_gmsh(geo_file, msh_file=debug_prefix + "output.msh", dim=2)
 
 
 def load_msh_with_meshio(msh_file):
@@ -299,58 +282,45 @@ def load_msh_with_meshio(msh_file):
     return nodes, cells_out
 
 
-# def main():
-#     """
-#     Full pipeline demonstration.
-#     1. Preprocess image -> binary
-#     2. Find contours+hierarchy
-#     3. Simplify polygons
-#     4. Build surfaces with holes
-#     5. Write .geo
-#     6. Run gmsh
-#     7. Load .msh
-#     """
-#     image_path = "your_periodic_tile.png"  # your input
-#     geo_file   = "output.geo"
-#     msh_file   = "output.msh"
-    
-#     # Step 1: Preprocess
-#     bin_img = preprocess_image(
-#         image_path, 
-#         threshold_val=127, 
-#         morph_open_ksize=3, 
-#         morph_close_ksize=3, 
-#         blur_ksize=3, 
-#         invert=False
-#     )
-    
-#     # Step 2: Find contours
-#     contours, hierarchy = find_contours_hierarchy(bin_img)
-#     if hierarchy is None:
-#         # means no contour found
-#         print("No contours found. Exiting.")
-#         return
-    
-#     # Step 3: Simplify polygons
-#     simplified_contours = simplify_contours(contours, epsilon_ratio=0.01)
-    
-#     # Step 4: Build surfaces with holes
-#     surfaces = build_surfaces_with_holes(simplified_contours, hierarchy)
-    
-#     # Step 5: Write .geo
-#     write_geo_file(simplified_contours, surfaces, geo_filename=geo_file, lc=10.0, flip_y=True)
-    
-#     # Step 6: Run gmsh
-#     run_gmsh(geo_file, msh_file, dim=2)
-    
-#     # Step 7: Load mesh
-#     nodes, cells = load_msh_with_meshio(msh_file)
-    
-#     print(f"Mesh loaded: #nodes={nodes.shape[0]}, #cell_blocks={len(cells)}")
-#     total_elems = sum(bl[1].shape[0] for bl in cells)
-#     print(f"Total elements = {total_elems}")
-    
-#     # Here you could proceed with your homogenization or finite element routine.
+def generate_mesh():
+    """
+    Full pipeline demonstration.
+    1. Preprocess image -> binary
+    2. Find contours+hierarchy
+    3. Simplify polygons
+    4. Build surfaces with holes
+    5. Write .geo
+    6. Run gmsh
+    7. Load .msh
+    """
+    design_path = "./designs/2d/symbolic_graph.npy"  # your input
+    geo_file = "./designs/2d/mesh.geo"
+    msh_file = "./designs/2d/mesh.msh"
+    bin_array = np.load(design_path)
 
-# if __name__ == "__main__":
-#     main()
+    # Step 1: Preprocess
+    bin_img = bin_array_to_cv2(bin_array, invert=True)
+
+    # Step 2: Find contours
+    contours, hierarchy = find_contours_hierarchy(bin_img)
+    if hierarchy is None:
+        # means no contour found
+        print("No contours found. Exiting.")
+        return
+
+    # Step 3: Simplify polygons
+    simplified_contours = simplify_contours(contours, epsilon_ratio=0.01)
+
+    # Step 4: Write .geo
+    write_geo_file_with_bounding_box(simplified_contours, geo_file, lc=50.0, flip_y=True, margin=1e-5)
+
+    # Step 5: Run gmsh
+    run_gmsh(geo_file, msh_file, dim=2)
+
+    # Step 6: Load mesh
+    # mesh = meshio.read(msh_file)
+
+    # Here you could proceed with your homogenization or finite element routine.
+
+
+generate_mesh()
