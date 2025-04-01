@@ -85,33 +85,36 @@ def get_nesting_level(idx, hierarchy):
     return level
 
 
-def write_geo_file_with_bounding_box(
+def write_geo_file_with_boolean_difference_and_periodic(
     contours,
     geo_filename="output.geo",
     lc=5.0,
-    flip_y=True,
-    margin=1e-5
+    flip_y=True
 ):
     """
-    Write a Gmsh .geo file (Plan #1: one bounding rectangle as outer boundary, 
-    plus holes). Then add Periodic lines for left-right and bottom-top edges.
+    Generate a Gmsh .geo file that:
+      1) Creates a big bounding rectangle as outer plane surface.
+      2) For each contour, define plane surface for holes.
+      3) Use BooleanDifference to subtract hole surfaces from bounding surface 
+         => newSurf[] = BooleanDifference{...}{...}.
+      4) Coherence => edges被拆分(若孔洞贴边).
+      5) Then we gather final boundary lines with "Line finalLines[] = Boundary{newSurf[0]};"
+         and script a loop to classify each line => left/right/bottom/top, 
+         then do line-by-line Periodic pair.
 
-    We'll force the rectangle edges to be lines:
-       l1 = bottom, l2 = right, l3 = top, l4 = left
-    so we can do:
-       Periodic Line{l2} = {l4};  // right = left
-       Periodic Line{l3} = {l1};  // top   = bottom
-       Coherence;
+    This avoids "Surface In BoundingBox(...)" syntax, so older Gmsh won't error out.
+
+    Note: If holes heavily subdivide edges, you might want to 
+          sort lines by mid coordinate for more accurate pairing.
 
     Args:
-        contours (list): List of hole contours from cv2.findContours ( Nx1x2 points each ).
-        geo_filename (str): Output .geo file path.
-        lc (float): Characteristic length for Gmsh.
-        flip_y (bool): Whether to invert y coords (OpenCV to typical CAD).
-        margin (float): Small margin to avoid holes exactly on boundary 
-                        which can cause gmsh geometry overlap.
+        contours (list): 2D hole contours (e.g. from cv2.findContours).
+        geo_filename (str):  path to .geo file to be written.
+        lc (float): characteristic length used in Gmsh for meshing.
+        flip_y (bool): if True, invert y-coordinates from (OpenCV to typical CAD).
     """
-    # 1) Determine bounding box from all contours
+
+    # 1) find bounding box from all contour points
     all_x, all_y = [], []
     for cnt in contours:
         for pt in cnt:
@@ -121,130 +124,177 @@ def write_geo_file_with_bounding_box(
     min_x, max_x = min(all_x), max(all_x)
     min_y, max_y = min(all_y), max(all_y)
 
-    # Expand by margin
-    min_x -= margin
-    max_x += margin
-    min_y -= margin
-    max_y += margin
-
-    # 2) Open .geo file
     with open(geo_filename, 'w') as f:
-        f.write('// Gmsh geometry with bounding-box outer boundary + holes + PERIODIC\n')
+        f.write('// Gmsh geometry with boolean difference + line-by-line periodic\n')
         f.write('SetFactory("OpenCASCADE");\n\n')
-        f.write('Mesh.RecombineAll = 1;')
+
+        # optional mesh constraints
+        f.write('Mesh.CharacteristicLengthMax = 10;\n')
+        f.write('Mesh.CharacteristicLengthMin = 1;\n')
+        f.write('Mesh.CharacteristicLengthFromPoints = 0;\n')
+        f.write('Mesh.CharacteristicLengthFromCurvature = 0;\n')
+        f.write('Mesh.RecombineAll = 1;\n\n')
+
+        def fy(v):
+            return -v if flip_y else v
 
         point_id = 1
         line_id = 1
-        loop_id = 1
+        surf_id = 1
 
-        # We'll store hole loops in hole_loop_ids
-        hole_loop_ids = []
-
-        # Helper to flip y
-        def flipy(val):
-            return -val if flip_y else val
-
-        # ---------------------------------------------------------
-        # (A) Define bounding rectangle:
-        #     p1->p2 (Line l1) = bottom
-        #     p2->p3 (Line l2) = right
-        #     p3->p4 (Line l3) = top
-        #     p4->p1 (Line l4) = left
-        # ---------------------------------------------------------
+        # (A) bounding rectangle => plane surface
         p1 = (min_x, min_y)
         p2 = (max_x, min_y)
         p3 = (max_x, max_y)
         p4 = (min_x, max_y)
 
-        # Write rectangle points
-        f.write(f'Point({point_id}) = {{{p1[0]}, {flipy(p1[1])}, 0, {lc}}};\n')
-        id_p1 = point_id; point_id += 1
-        f.write(f'Point({point_id}) = {{{p2[0]}, {flipy(p2[1])}, 0, {lc}}};\n')
-        id_p2 = point_id; point_id += 1
-        f.write(f'Point({point_id}) = {{{p3[0]}, {flipy(p3[1])}, 0, {lc}}};\n')
-        id_p3 = point_id; point_id += 1
-        f.write(f'Point({point_id}) = {{{p4[0]}, {flipy(p4[1])}, 0, {lc}}};\n')
-        id_p4 = point_id; point_id += 1
+        f.write(f'Point({point_id}) = {{{p1[0]},{fy(p1[1])},0,{lc}}};\n')
+        id_p1 = point_id; point_id+=1
+        f.write(f'Point({point_id}) = {{{p2[0]},{fy(p2[1])},0,{lc}}};\n')
+        id_p2 = point_id; point_id+=1
+        f.write(f'Point({point_id}) = {{{p3[0]},{fy(p3[1])},0,{lc}}};\n')
+        id_p3 = point_id; point_id+=1
+        f.write(f'Point({point_id}) = {{{p4[0]},{fy(p4[1])},0,{lc}}};\n')
+        id_p4 = point_id; point_id+=1
 
-        # Lines
-        # l1: bottom, l2: right, l3: top, l4: left
-        f.write(f'Line({line_id}) = {{{id_p1}, {id_p2}}};\n')  # bottom
-        l1 = line_id
-        line_id += 1
+        f.write(f'Line({line_id}) = {{{id_p1},{id_p2}}};\n'); lB=line_id; line_id+=1
+        f.write(f'Line({line_id}) = {{{id_p2},{id_p3}}};\n'); lR=line_id; line_id+=1
+        f.write(f'Line({line_id}) = {{{id_p3},{id_p4}}};\n'); lT=line_id; line_id+=1
+        f.write(f'Line({line_id}) = {{{id_p4},{id_p1}}};\n'); lL=line_id; line_id+=1
 
-        f.write(f'Line({line_id}) = {{{id_p2}, {id_p3}}};\n')  # right
-        l2 = line_id
-        line_id += 1
+        f.write(f'Curve Loop({surf_id}) = {{{lB},{lR},{lT},{lL}}};\n')
+        boundingLoopId = surf_id
+        surf_id+=1
+        f.write(f'Plane Surface({surf_id}) = {{{boundingLoopId}}};\n')
+        boundingSurfId = surf_id
+        surf_id+=1
 
-        f.write(f'Line({line_id}) = {{{id_p3}, {id_p4}}};\n')  # top
-        l3 = line_id
-        line_id += 1
-
-        f.write(f'Line({line_id}) = {{{id_p4}, {id_p1}}};\n')  # left
-        l4 = line_id
-        line_id += 1
-
-        # Outer loop
-        f.write(f'Curve Loop({loop_id}) = {{{l1},{l2},{l3},{l4}}};\n')
-        outer_loop_id = loop_id
-        loop_id += 1
-
-        # ---------------------------------------------------------
-        # (B) Holes: each contour => lines => hole loop
-        # ---------------------------------------------------------
+        # (B) define hole surfaces
+        holeSurfIds = []
         for i, cnt in enumerate(contours):
-            n_pts = cnt.shape[0]
-            contour_pts = []
-            for j in range(n_pts):
-                xj, yj = cnt[j, 0, 0], cnt[j, 0, 1]
-                if flip_y:
+            npts = cnt.shape[0]
+            holePointIds = []
+            for j in range(npts):
+                xj, yj = cnt[j,0,0], cnt[j,0,1]
+                if flip_y: 
                     yj = -yj
                 f.write(f'Point({point_id}) = {{{xj},{yj},0,{lc}}};\n')
-                contour_pts.append(point_id)
-                point_id += 1
+                holePointIds.append(point_id)
+                point_id+=1
 
             start_line = line_id
-            for j in range(n_pts):
-                pA = contour_pts[j]
-                pB = contour_pts[(j+1)%n_pts]
+            for j in range(npts):
+                pA = holePointIds[j]
+                pB = holePointIds[(j+1) % npts]
                 f.write(f'Line({line_id}) = {{{pA},{pB}}};\n')
-                line_id += 1
+                line_id+=1
             end_line = line_id - 1
 
-            current_loop_id = loop_id
-            lines_str = ",".join(str(lid) for lid in range(start_line, end_line+1))
-            f.write(f'Curve Loop({current_loop_id}) = {{{lines_str}}};\n')
-            hole_loop_ids.append(current_loop_id)
-            loop_id += 1
+            f.write(f'Curve Loop({surf_id}) = {{{",".join(map(str,range(start_line,end_line+1)))}}};\n')
+            holeLoopId = surf_id
+            surf_id+=1
+            f.write(f'Plane Surface({surf_id}) = {{{holeLoopId}}};\n')
+            holeSurfId = surf_id
+            holeSurfIds.append(holeSurfId)
+            surf_id+=1
 
-        # ---------------------------------------------------------
-        # (C) Single plane surface => outer_loop + holes
-        # ---------------------------------------------------------
-        plane_surface_id = 1
-        if len(hole_loop_ids) > 0:
-            hole_str = ",".join(str(hid) for hid in hole_loop_ids)
-            f.write(f'Plane Surface({plane_surface_id}) = {{{outer_loop_id},{hole_str}}};\n')
+        # (C) Boolean difference => store result in newSurf[], so we can reference it later
+        f.write('\n')
+        if len(holeSurfIds)>0:
+            holes_str = ",".join(str(h) for h in holeSurfIds)
+            f.write('newSurf[] = BooleanDifference{ Surface{')
+            f.write(str(boundingSurfId))
+            f.write('}; Delete; }{ Surface{')
+            f.write(holes_str)
+            f.write('}; Delete; };\n')
         else:
-            f.write(f'Plane Surface({plane_surface_id}) = {{{outer_loop_id}}};\n')
+            # no holes => just define newSurf[0] as boundingSurfId
+            f.write(f'newSurf[] = {{{boundingSurfId}}};\n')
 
-        # ---------------------------------------------------------
-        # (D) Add PERIODIC for lines: l2=right, l4=left, l3=top, l1=bottom
-        #     => we want left-right periodic, top-bottom periodic
-        #     => in Gmsh syntax: 
-        #         Periodic Line{ RightLineID } = { LeftLineID };
-        #         Periodic Line{ TopLineID   } = { BottomLineID };
-        #         Coherence;
-        #    Make sure your geometry REALLY matches l2-l4 horizontally, l1-l3 vertically
-        #    i.e. the bounding box is perfect rectangle. 
-        # ---------------------------------------------------------
- 
-        f.write(f"Periodic Line{{{l2}}} = {{{l4}}};\n")  # right = left
-        f.write(f"Periodic Line{{{l3}}} = {{{l1}}};\n")  # top   = bottom
-        f.write("Coherence;\n")
-  
-        f.write('// end .geo\n')
+        f.write('Coherence;\n\n')
 
-    print(f"[+] Wrote periodic .geo => {geo_filename}")
+        # (D) Insert script to gather boundary lines of newSurf[0], then do classification & Periodic
+        # We'll define Xmin=..., Xmax=..., Ymin=..., Ymax=...
+        # Then use bounding box logic. 
+        # Must carefully handle sign if flip_y. Let's keep direct bounding coords:
+
+        bounding_script = f"""
+//////////////////////////////////////////////////////
+// (D) Classify final boundary lines of newSurf[0], 
+// then do line-by-line periodic
+//////////////////////////////////////////////////////
+
+Line finalLines[] = Boundary{{ newSurf[0] }};
+
+leftSet[] = {{}};
+rightSet[] = {{}};
+bottomSet[] = {{}};
+topSet[] = {{}};
+
+tol = 1e-5;
+
+Function xMin(l) = BoundingBox{{l}}[0];
+Function yMin(l) = BoundingBox{{l}}[1];
+Function xMax(l) = BoundingBox{{l}}[3];
+Function yMax(l) = BoundingBox{{l}}[4];
+
+For i In {{0 : #finalLines[]-1}}
+  ll = finalLines[i];
+  xm1 = xMin(ll); ym1 = yMin(ll);
+  xm2 = xMax(ll); ym2 = yMax(ll);
+
+  // left
+  If( Abs(xm1 - {min_x})<tol & Abs(xm2 - {min_x})<tol )
+    leftSet[#leftSet[]] = ll;
+    Continue;
+  EndIf
+  // right
+  If( Abs(xm1 - {max_x})<tol & Abs(xm2 - {max_x})<tol )
+    rightSet[#rightSet[]] = ll;
+    Continue;
+  EndIf
+  // bottom
+  If( Abs(ym1 - {fy(min_y)})<tol & Abs(ym2 - {fy(min_y)})<tol )
+    bottomSet[#bottomSet[]] = ll;
+    Continue;
+  EndIf
+  // top
+  If( Abs(ym1 - {fy(max_y)})<tol & Abs(ym2 - {fy(max_y)})<tol )
+    topSet[#topSet[]] = ll;
+    Continue;
+  EndIf
+EndFor
+
+// naive pair by index
+// leftSet vs rightSet
+nL = #leftSet[];
+nR = #rightSet[];
+If(nL == nR)
+  For j In {{0 : nL-1}}
+    Periodic Line{{ rightSet[j] }} = {{ leftSet[j] }};
+  EndFor
+Else
+  Printf("Warning: mismatch left(#=%g) vs right(#=%g)", nL, nR);
+EndIf
+
+// bottomSet vs topSet
+nB = #bottomSet[];
+nT = #topSet[];
+If(nB == nT)
+  For j In {{0 : nB-1}}
+    Periodic Line{{ topSet[j] }} = {{ bottomSet[j] }};
+  EndFor
+Else
+  Printf("Warning: mismatch bottom(#=%g) vs top(#=%g)", nB, nT);
+EndIf
+
+Coherence();
+//////////////////////////////////////////////////////
+"""
+        f.write(bounding_script)
+        f.write("// end final script\n")
+
+    print(f"[+] Wrote .geo with advanced boolean diff + line-by-line periodic =>", geo_filename)
 
 
 def run_gmsh(geo_file, msh_file="/design/2d/fem_mesh.msh", dim=2):
@@ -310,10 +360,10 @@ def generate_mesh():
         return
 
     # Step 3: Simplify polygons
-    simplified_contours = simplify_contours(contours, epsilon_ratio=0.01)
+    simplified_contours = simplify_contours(contours, epsilon_ratio=0.02)
 
     # Step 4: Write .geo
-    write_geo_file_with_bounding_box(simplified_contours, geo_file, lc=50.0, flip_y=True, margin=1e-5)
+    write_geo_file_with_boolean_difference_and_periodic(simplified_contours, geo_file, lc=50.0, flip_y=True)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)
