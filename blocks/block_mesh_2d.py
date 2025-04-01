@@ -129,10 +129,8 @@ def write_geo_file_with_boolean_difference_and_periodic(
         f.write('SetFactory("OpenCASCADE");\n\n')
 
         # optional mesh constraints
-        f.write('Mesh.CharacteristicLengthMax = 10;\n')
-        f.write('Mesh.CharacteristicLengthMin = 1;\n')
+        f.write('Mesh.CharacteristicLengthExtendFromBoundary = 1;\n')
         f.write('Mesh.CharacteristicLengthFromPoints = 0;\n')
-        f.write('Mesh.CharacteristicLengthFromCurvature = 0;\n')
         f.write('Mesh.RecombineAll = 1;\n\n')
 
         def fy(v):
@@ -224,7 +222,7 @@ def write_geo_file_with_boolean_difference_and_periodic(
 // then do line-by-line periodic
 //////////////////////////////////////////////////////
 
-Line finalLines[] = Boundary{{ newSurf[0] }};
+finalLines[] = Boundary{{ Surface{{newSurf[0]}}; }};
 
 leftSet[] = {{}};
 rightSet[] = {{}};
@@ -233,35 +231,29 @@ topSet[] = {{}};
 
 tol = 1e-5;
 
-Function xMin(l) = BoundingBox{{l}}[0];
-Function yMin(l) = BoundingBox{{l}}[1];
-Function xMax(l) = BoundingBox{{l}}[3];
-Function yMax(l) = BoundingBox{{l}}[4];
-
 For i In {{0 : #finalLines[]-1}}
   ll = finalLines[i];
-  xm1 = xMin(ll); ym1 = yMin(ll);
-  xm2 = xMax(ll); ym2 = yMax(ll);
+  bb[] = BoundingBox Line {{ll}};
+  xm1 = bb[0];
+  ym1 = bb[1];
+  xm2 = bb[3];
+  ym2 = bb[4];
 
   // left
-  If( Abs(xm1 - {min_x})<tol & Abs(xm2 - {min_x})<tol )
+  If( Abs(xm1 - {min_x})<tol && Abs(xm2 - {min_x})<tol )
     leftSet[#leftSet[]] = ll;
-    Continue;
   EndIf
   // right
-  If( Abs(xm1 - {max_x})<tol & Abs(xm2 - {max_x})<tol )
+  If( Abs(xm1 - {max_x})<tol && Abs(xm2 - {max_x})<tol )
     rightSet[#rightSet[]] = ll;
-    Continue;
   EndIf
   // bottom
-  If( Abs(ym1 - {fy(min_y)})<tol & Abs(ym2 - {fy(min_y)})<tol )
+  If( Abs(ym1 - {fy(min_y)})<tol && Abs(ym2 - {fy(min_y)})<tol )
     bottomSet[#bottomSet[]] = ll;
-    Continue;
   EndIf
   // top
-  If( Abs(ym1 - {fy(max_y)})<tol & Abs(ym2 - {fy(max_y)})<tol )
+  If( Abs(ym1 - {fy(max_y)})<tol && Abs(ym2 - {fy(max_y)})<tol )
     topSet[#topSet[]] = ll;
-    Continue;
   EndIf
 EndFor
 
@@ -271,7 +263,8 @@ nL = #leftSet[];
 nR = #rightSet[];
 If(nL == nR)
   For j In {{0 : nL-1}}
-    Periodic Line{{ rightSet[j] }} = {{ leftSet[j] }};
+    reverseIndex = nL - 1 - j;
+    Periodic Line{{ rightSet[j] }} = {{ leftSet[reverseIndex] }};
   EndFor
 Else
   Printf("Warning: mismatch left(#=%g) vs right(#=%g)", nL, nR);
@@ -282,13 +275,14 @@ nB = #bottomSet[];
 nT = #topSet[];
 If(nB == nT)
   For j In {{0 : nB-1}}
-    Periodic Line{{ topSet[j] }} = {{ bottomSet[j] }};
+    reverseIndex = nL - 1 - j;
+    Periodic Line{{ topSet[j] }} = {{ bottomSet[reverseIndex] }};
   EndFor
 Else
   Printf("Warning: mismatch bottom(#=%g) vs top(#=%g)", nB, nT);
 EndIf
 
-Coherence();
+Coherence;
 //////////////////////////////////////////////////////
 """
         f.write(bounding_script)
@@ -360,10 +354,10 @@ def generate_mesh():
         return
 
     # Step 3: Simplify polygons
-    simplified_contours = simplify_contours(contours, epsilon_ratio=0.02)
+    simplified_contours = simplify_contours(contours, epsilon_ratio=0.015)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(simplified_contours, geo_file, lc=50.0, flip_y=True)
+    write_geo_file_with_boolean_difference_and_periodic(simplified_contours, geo_file, lc=30.0, flip_y=True)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)
