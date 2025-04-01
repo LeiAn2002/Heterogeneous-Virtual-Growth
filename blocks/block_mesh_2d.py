@@ -354,7 +354,7 @@ def generate_mesh():
         return
 
     # Step 3: Simplify polygons
-    simplified_contours = simplify_contours(contours, epsilon_ratio=0.015)
+    simplified_contours = simplify_contours(contours, epsilon_ratio=0.01)
 
     # Step 4: Write .geo
     write_geo_file_with_boolean_difference_and_periodic(simplified_contours, geo_file, lc=30.0, flip_y=True)
