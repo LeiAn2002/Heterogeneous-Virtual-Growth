@@ -36,7 +36,7 @@ match dim:
         # r_array = np.array([0.0, 0.0, 0.0, 0.0])
         # v_array = np.array([0.2, 0.2, 0.2, 0.2])
 
-        first_row_v = np.linspace(0.2, 0.4, 6)
+        first_row_v = np.linspace(0.6, 0.8, 6)
         v_array = np.tile(first_row_v, (6, 1))
         a = v_array
         b = np.hstack([v_array[:, 1:], v_array[:, -1:]])
