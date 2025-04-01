@@ -166,8 +166,6 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
     plt.figure(figsize=(8, 8))
     plt.axis("off")
     plt.imshow(colored_final_raster, cmap=cmap, origin="upper")
-    # plt.colorbar()
-    # plt.title("Microstructure 2D Binary Raster")
     if save_path:
         plt.savefig(save_path + fig_name, bbox_inches="tight")
     plt.close()
