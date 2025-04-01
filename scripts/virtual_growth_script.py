@@ -51,7 +51,7 @@ match dim:
         # frequency_hints = np.vstack([flattened, second_third_row])
         # frequency_hints = frequency_hints.T
 
-        first_row_r = np.linspace(1.0, 0, 6)
+        first_row_r = np.linspace(0.7, 0, 6)
         r_array = np.tile(first_row_r, (6, 1))
         r_array = r_array.flatten()
 

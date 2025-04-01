@@ -4,6 +4,7 @@ import cv2
 import meshio
 import numpy as np
 
+
 def bin_array_to_cv2(bin_array, invert=False):
     """
     Convert a 2D numpy array of 0/1 to a 0/255 uint8 image for OpenCV.
@@ -37,10 +38,11 @@ def find_contours_hierarchy(bin_img):
         contours (list): A list of contour arrays.
         hierarchy (np.ndarray): A (1, N, 4) array describing each contour's relations.
     """
-    kernel = np.ones((2, 2), np.uint8)
+    kernel = np.ones((3, 3), np.uint8)
     bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel, iterations=1)
     bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel, iterations=1)
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # debug_prefix = "./designs/2d/debug/"
     # debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
     # cv2.drawContours(debug_img, contours, -1, (0,0,255), 2)
     # cv2.imwrite(debug_prefix + "contours.png", debug_img)
@@ -275,7 +277,7 @@ nB = #bottomSet[];
 nT = #topSet[];
 If(nB == nT)
   For j In {{0 : nB-1}}
-    reverseIndex = nL - 1 - j;
+    reverseIndex = nB - 1 - j;
     Periodic Line{{ topSet[j] }} = {{ bottomSet[reverseIndex] }};
   EndFor
 Else

@@ -146,12 +146,13 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
     final_raster = linear_filter(final_raster, 4)
     final_raster = heaviside(final_raster, 128)
 
+    colored_final_raster = final_raster.copy()
+
     for y in range(full_mesh.shape[0]):
         for x in range(full_mesh.shape[1]):
             top = y * block_size
             left = x * block_size
             label_id = color_label_matrix[y, x]
-            colored_final_raster = final_raster.copy()
             colored_final_raster[top:top+block_size, left:left+block_size] *= label_id
 
     num_labels = next_label  # 1..(next_label-1) are real block labels
