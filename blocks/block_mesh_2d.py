@@ -38,7 +38,7 @@ def find_contours_hierarchy(bin_img):
         contours (list): A list of contour arrays.
         hierarchy (np.ndarray): A (1, N, 4) array describing each contour's relations.
     """
-    kernel = np.ones((3, 3), np.uint8)
+    kernel = np.ones((4, 4), np.uint8)
     bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel, iterations=1)
     bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel, iterations=1)
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
