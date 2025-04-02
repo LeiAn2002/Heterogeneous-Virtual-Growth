@@ -421,18 +421,19 @@ def load_msh_with_meshio(msh_file):
     """
     mesh = meshio.read(msh_file)
     # mesh.points -> (N, 3)
-    nodes = mesh.points[:, :2].copy()
+    nodes = mesh.points.copy()
     
-    cells_out = []
+    elements = []
     for block in mesh.cells:
         ctype = block.type
         cdata = block.data
         # we only gather 2D cells: triangle or quad
-        if ctype in ["triangle", "quad"]:
-            cells_out.append(cdata)
+        n_cells = cdata.shape[0]
+        element = np.column_stack([4*np.ones(n_cells, dtype=cdata.dtype), cdata])
+        elements.append(element)
         
-    cells_out = np.array(cells_out)
-    return nodes, cells_out
+    elements = np.vstack(elements) if len(elements) > 0 else np.array([], dtype=int).reshape(0, 5)
+    return nodes, elements
 
 
 def downscale_binary_image(bin_img, 
