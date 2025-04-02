@@ -219,6 +219,8 @@ def write_geo_file_with_boolean_difference_and_periodic(
         f.write('Mesh.CharacteristicLengthFromPoints = 0;\n')
         f.write('Mesh.CharacteristicLengthFromCurvature = 0;\n')
         f.write('Mesh.RecombineAll = 1;\n\n')
+        f.write('Mesh.RecombinationAlgorithm = 3;\n\n')
+        f.write('Mesh.ElementOrder = 1;\n\n')
 
         def fy(v):
             return -v if flip_y else v
