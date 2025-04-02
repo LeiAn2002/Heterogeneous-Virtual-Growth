@@ -28,7 +28,7 @@ dim = 2
 match dim:
     case 2:
         mesh_size = (6, 6)
-        element_size = (2, 2)
+        element_size = (1, 1)
         candidates = ["cross", "T"]
         num_elems = np.prod(mesh_size)
         frequency_hints = np.random.rand(num_elems, len(candidates))

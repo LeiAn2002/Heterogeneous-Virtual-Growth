@@ -66,7 +66,7 @@ def filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=2.0, boundary_
             onA = is_on_boundary(pA[0], pA[1], min_x, max_x, min_y, max_y, boundary_tol)
             onB = is_on_boundary(pB[0], pB[1], min_x, max_x, min_y, max_y, boundary_tol)
 
-            if distAB < min_dist and (not onA) and (not onB):
+            if distAB < min_dist:
                 # measure distance to bounding rect
                 dA = distance_to_rect(pA[0], pA[1], min_x, max_x, min_y, max_y)
                 dB = distance_to_rect(pB[0], pB[1], min_x, max_x, min_y, max_y)
@@ -425,14 +425,10 @@ def load_msh_with_meshio(msh_file):
     
     elements = []
     for block in mesh.cells:
-        ctype = block.type
-        cdata = block.data
-        # we only gather 2D cells: triangle or quad
-        n_cells = cdata.shape[0]
-        element = np.column_stack([4*np.ones(n_cells, dtype=cdata.dtype), cdata])
-        elements.append(element)
-        
-    elements = np.vstack(elements) if len(elements) > 0 else np.array([], dtype=int).reshape(0, 5)
+        if block.type == "quad":
+            elements = block.data
+            elements = elements[:, [0, 3, 2, 1]]
+            break
     return nodes, elements
 
 
@@ -510,7 +506,7 @@ def generate_mesh(
     write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=20.0, flip_y=True, min_dist_for_merge=8)
 
     # Step 5: Run gmsh
-    # run_gmsh(geo_file, msh_file, dim=2)
+    run_gmsh(geo_file, msh_file, dim=2)
 
     # downscaled_bin_img = downscale_binary_image(bin_img, scale=0.5, interpolation=cv2.INTER_AREA)
     # cv2.imwrite("./designs/2d/downscaled.png", downscaled_bin_img)
