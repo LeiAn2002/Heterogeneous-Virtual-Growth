@@ -3,6 +3,86 @@ import subprocess
 import cv2
 import meshio
 import numpy as np
+import math
+
+
+def is_on_boundary(px, py, min_x, max_x, min_y, max_y, tol=1e-12):
+    """
+    Check if (px,py) is on the rectangular boundary [min_x, max_x] x [min_y, max_y],
+    within a small numerical tolerance 'tol'.
+    """
+    on_left   = abs(px - min_x) < tol
+    on_right  = abs(px - max_x) < tol
+    on_bottom = abs(py - min_y) < tol
+    on_top    = abs(py - max_y) < tol
+    return (on_left or on_right or on_bottom or on_top)
+
+
+def distance_to_rect(px, py, min_x, max_x, min_y, max_y):
+    """
+    Compute minimum distance from point(px, py) to the rectangle edges
+    defined by [min_x, max_x] x [min_y, max_y].
+    """
+    d_left   = abs(px - min_x)
+    d_right  = abs(px - max_x)
+    d_bottom = abs(py - min_y)
+    d_top    = abs(py - max_y)
+    return min(d_left, d_right, d_bottom, d_top)
+
+
+def filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=2.0, boundary_tol=1e-5):
+    """
+    Given a contour (list/array of points), merge any two consecutive points
+    whose distance < min_dist.
+    
+    Implementation detail:
+    - We'll do a single pass from i=0 to i=len(cnt)-1.
+    - If dist(cnt[i], cnt[i+1]) < min_dist, 
+      we create newPt = midpoint(cnt[i], cnt[i+1]),
+      add newPt to filtered, then skip the next index.
+    - Otherwise we keep cnt[i].
+    - At the end, we also handle the last point if it wasn't merged.
+    
+    If the contour is closed (the last point connects back to the first),
+    you can do more advanced wrap-around logic. Here we'll keep it simple:
+    no wrap-around merging.
+    """
+    filtered = []
+    i = 0
+    n = len(cnt)
+    while i < n:
+        if i == n - 1:
+            # last point => just keep it
+            filtered.append(cnt[i])
+            i += 1
+        else:
+            # check dist of current point vs next
+            pA = cnt[i][0]  # shape (2,)
+            pB = cnt[i+1][0]
+            dx = pA[0] - pB[0]
+            dy = pA[1] - pB[1]
+            distAB = math.hypot(dx, dy)
+
+            onA = is_on_boundary(pA[0], pA[1], min_x, max_x, min_y, max_y, boundary_tol)
+            onB = is_on_boundary(pB[0], pB[1], min_x, max_x, min_y, max_y, boundary_tol)
+
+            if distAB < min_dist and (not onA) and (not onB):
+                # measure distance to bounding rect
+                dA = distance_to_rect(pA[0], pA[1], min_x, max_x, min_y, max_y)
+                dB = distance_to_rect(pB[0], pB[1], min_x, max_x, min_y, max_y)
+                if dA <= dB:
+                    # A is closer => keep A
+                    filtered.append(cnt[i])
+                else:
+                    # B is closer => keep B
+                    filtered.append(cnt[i+1])
+                i += 2  # skip next
+            else:
+                # keep the current point
+                filtered.append(cnt[i])
+                i += 1
+
+    return filtered
 
 
 def bin_array_to_cv2(bin_array, invert=False):
@@ -38,14 +118,15 @@ def find_contours_hierarchy(bin_img):
         contours (list): A list of contour arrays.
         hierarchy (np.ndarray): A (1, N, 4) array describing each contour's relations.
     """
-    kernel = np.ones((4, 4), np.uint8)
-    bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel, iterations=1)
-    bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel, iterations=1)
+    # kernel_open = np.ones((3, 3), np.uint8)
+    # kernel_close = np.ones((3, 3), np.uint8)
+    # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel_open, iterations=1)
+    # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel_close, iterations=1)
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    # debug_prefix = "./designs/2d/debug/"
-    # debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
-    # cv2.drawContours(debug_img, contours, -1, (0,0,255), 2)
-    # cv2.imwrite(debug_prefix + "contours.png", debug_img)
+    debug_prefix = "./designs/2d/"
+    debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
+    cv2.drawContours(debug_img, contours, -1, (0,0,255), 2)
+    cv2.imwrite(debug_prefix + "contours_for_debug.png", debug_img)
     return contours, hierarchy
 
 
@@ -91,7 +172,8 @@ def write_geo_file_with_boolean_difference_and_periodic(
     contours,
     geo_filename="output.geo",
     lc=5.0,
-    flip_y=True
+    flip_y=True,
+    min_dist_for_merge=2.0
 ):
     """
     Generate a Gmsh .geo file that:
@@ -99,7 +181,7 @@ def write_geo_file_with_boolean_difference_and_periodic(
       2) For each contour, define plane surface for holes.
       3) Use BooleanDifference to subtract hole surfaces from bounding surface 
          => newSurf[] = BooleanDifference{...}{...}.
-      4) Coherence => edges被拆分(若孔洞贴边).
+      4) Coherence => edges
       5) Then we gather final boundary lines with "Line finalLines[] = Boundary{newSurf[0]};"
          and script a loop to classify each line => left/right/bottom/top, 
          then do line-by-line Periodic pair.
@@ -131,8 +213,11 @@ def write_geo_file_with_boolean_difference_and_periodic(
         f.write('SetFactory("OpenCASCADE");\n\n')
 
         # optional mesh constraints
-        f.write('Mesh.CharacteristicLengthExtendFromBoundary = 1;\n')
+        f.write('Mesh.CharacteristicLengthMax = 10;\n')
+        f.write('Mesh.CharacteristicLengthMin = 1;\n')
+        # f.write('Mesh.CharacteristicLengthExtendFromBoundary = 1;\n')
         f.write('Mesh.CharacteristicLengthFromPoints = 0;\n')
+        f.write('Mesh.CharacteristicLengthFromCurvature = 0;\n')
         f.write('Mesh.RecombineAll = 1;\n\n')
 
         def fy(v):
@@ -149,58 +234,77 @@ def write_geo_file_with_boolean_difference_and_periodic(
         p4 = (min_x, max_y)
 
         f.write(f'Point({point_id}) = {{{p1[0]},{fy(p1[1])},0,{lc}}};\n')
-        id_p1 = point_id; point_id+=1
+        id_p1 = point_id
+        point_id += 1
         f.write(f'Point({point_id}) = {{{p2[0]},{fy(p2[1])},0,{lc}}};\n')
-        id_p2 = point_id; point_id+=1
+        id_p2 = point_id
+        point_id += 1
         f.write(f'Point({point_id}) = {{{p3[0]},{fy(p3[1])},0,{lc}}};\n')
-        id_p3 = point_id; point_id+=1
+        id_p3 = point_id
+        point_id += 1
         f.write(f'Point({point_id}) = {{{p4[0]},{fy(p4[1])},0,{lc}}};\n')
-        id_p4 = point_id; point_id+=1
+        id_p4 = point_id
+        point_id += 1
 
-        f.write(f'Line({line_id}) = {{{id_p1},{id_p2}}};\n'); lB=line_id; line_id+=1
-        f.write(f'Line({line_id}) = {{{id_p2},{id_p3}}};\n'); lR=line_id; line_id+=1
-        f.write(f'Line({line_id}) = {{{id_p3},{id_p4}}};\n'); lT=line_id; line_id+=1
-        f.write(f'Line({line_id}) = {{{id_p4},{id_p1}}};\n'); lL=line_id; line_id+=1
+        f.write(f'Line({line_id}) = {{{id_p1},{id_p2}}};\n')
+        lB = line_id
+        line_id += 1
+        f.write(f'Line({line_id}) = {{{id_p2},{id_p3}}};\n')
+        lR = line_id
+        line_id += 1
+        f.write(f'Line({line_id}) = {{{id_p3},{id_p4}}};\n')
+        lT = line_id
+        line_id += 1
+        f.write(f'Line({line_id}) = {{{id_p4},{id_p1}}};\n')
+        lL = line_id
+        line_id += 1
 
         f.write(f'Curve Loop({surf_id}) = {{{lB},{lR},{lT},{lL}}};\n')
         boundingLoopId = surf_id
-        surf_id+=1
+        surf_id += 1
         f.write(f'Plane Surface({surf_id}) = {{{boundingLoopId}}};\n')
         boundingSurfId = surf_id
-        surf_id+=1
+        surf_id += 1
 
         # (B) define hole surfaces
         holeSurfIds = []
         for i, cnt in enumerate(contours):
-            npts = cnt.shape[0]
+            for i in range(3):
+                cnt = filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=min_dist_for_merge)
+
+            npts = len(cnt)
+            if npts < 2:
+                # If it becomes too short, skip
+                continue
+
             holePointIds = []
             for j in range(npts):
-                xj, yj = cnt[j,0,0], cnt[j,0,1]
-                if flip_y: 
+                xj, yj = cnt[j][0]
+                if flip_y:
                     yj = -yj
                 f.write(f'Point({point_id}) = {{{xj},{yj},0,{lc}}};\n')
                 holePointIds.append(point_id)
-                point_id+=1
+                point_id += 1
 
             start_line = line_id
             for j in range(npts):
                 pA = holePointIds[j]
-                pB = holePointIds[(j+1) % npts]
+                pB = holePointIds[(j+1) % npts]  # wrap around if closed
                 f.write(f'Line({line_id}) = {{{pA},{pB}}};\n')
-                line_id+=1
-            end_line = line_id - 1
+                line_id += 1
+            end_line = line_id-1
 
             f.write(f'Curve Loop({surf_id}) = {{{",".join(map(str,range(start_line,end_line+1)))}}};\n')
             holeLoopId = surf_id
-            surf_id+=1
+            surf_id += 1
             f.write(f'Plane Surface({surf_id}) = {{{holeLoopId}}};\n')
             holeSurfId = surf_id
             holeSurfIds.append(holeSurfId)
-            surf_id+=1
+            surf_id += 1
 
         # (C) Boolean difference => store result in newSurf[], so we can reference it later
         f.write('\n')
-        if len(holeSurfIds)>0:
+        if len(holeSurfIds) > 0:
             holes_str = ",".join(str(h) for h in holeSurfIds)
             f.write('newSurf[] = BooleanDifference{ Surface{')
             f.write(str(boundingSurfId))
@@ -329,6 +433,47 @@ def load_msh_with_meshio(msh_file):
     return nodes, cells_out
 
 
+def downscale_binary_image(bin_img, 
+                           target_size=(None,None), 
+                           scale=0.25, 
+                           interpolation=cv2.INTER_AREA):
+    """
+    Downscale a large binary image (0 or 255) to a smaller size 
+    while trying to preserve shape outlines.
+
+    Args:
+        bin_img (np.ndarray): Original large binary image, shape (H,W), dtype=uint8 in {0,255}
+        target_size (tuple): (newWidth, newHeight); if both not None, we use it directly
+        scale (float): if target_size is None, we compute new size = scale * original
+        interpolation: e.g. cv2.INTER_AREA for downscaling
+
+    Returns:
+        small_bin (np.ndarray): The smaller binary image (0/255)
+    """
+    H, W = bin_img.shape[:2]
+
+    # 1) Decide new size
+    if target_size[0] is not None and target_size[1] is not None:
+        newW, newH = target_size
+    else:
+        newW = int(W * scale)
+        newH = int(H * scale)
+
+    # 2) Resize
+    # Convert to float or keep as is? We can keep as uint8 because we're simply downscaling
+    # bin_img is already 0/255, so direct usage is okay
+    resized = cv2.resize(bin_img, (newW, newH), interpolation=interpolation)
+
+    # 3) Optional threshold => ensure it's strictly 0 or 255
+    # Because resize might produce values in [0..255] but not strictly 0 or 255
+    # if using INTER_AREA or something else
+    # 
+    # If we want a strict bin:
+    _, small_bin = cv2.threshold(resized, 127, 255, cv2.THRESH_BINARY)
+
+    return small_bin
+
+
 def generate_mesh():
     """
     Full pipeline demonstration.
@@ -356,18 +501,19 @@ def generate_mesh():
         return
 
     # Step 3: Simplify polygons
-    simplified_contours = simplify_contours(contours, epsilon_ratio=0.01)
+    # simplified_contours = simplify_contours(contours, epsilon_ratio=0.00)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(simplified_contours, geo_file, lc=20.0, flip_y=True)
+    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=20.0, flip_y=True, min_dist_for_merge=5)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)
+
+    downscaled_bin_img = downscale_binary_image(bin_img, scale=0.5, interpolation=cv2.INTER_AREA)
+    cv2.imwrite("./designs/2d/downscaled.png", downscaled_bin_img)
+    print("Downscaled shape:", downscaled_bin_img.shape[0] * downscaled_bin_img.shape[1])
 
     # Step 6: Load mesh
     # mesh = meshio.read(msh_file)
 
     # Here you could proceed with your homogenization or finite element routine.
-
-
-generate_mesh()

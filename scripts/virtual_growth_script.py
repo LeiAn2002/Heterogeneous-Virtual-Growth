@@ -22,6 +22,7 @@ Citations:
 import numpy as np
 from virtual_growth.main import main
 import time
+from blocks.block_mesh_2d import generate_mesh
 
 dim = 2
 match dim:
@@ -36,7 +37,7 @@ match dim:
         # r_array = np.array([0.0, 0.0, 0.0, 0.0])
         # v_array = np.array([0.2, 0.2, 0.2, 0.2])
 
-        first_row_v = np.linspace(0.6, 0.7, 6)
+        first_row_v = np.linspace(0.2, 0.7, 6)
         v_array = np.tile(first_row_v, (6, 1))
         a = v_array
         b = np.hstack([v_array[:, 1:], v_array[:, -1:]])
@@ -83,4 +84,5 @@ if __name__ == "__main__":
          gif_name=gif_name,
          save_mesh=True, save_mesh_path=save_path,
          save_mesh_name="symbolic_graph.npy")
+    generate_mesh()
     print("Time elapsed: ", time.time() - start_time)
