@@ -158,7 +158,7 @@ def generate_random_control_points(basic_points, r, outer_count):
                 angle = random.uniform(0, 2 * np.pi)
                 cx = bx + rr * np.cos(angle)
                 cy = by + rr * np.sin(angle)
-                if abs(cx) <= 0.8 and abs(cy) <= 0.8 and abs(cx) + abs(cy) < 1.2:
+                if abs(cx) + abs(cy) < 1.0:
                     break
         control_points.append((cx, cy))
     return control_points
@@ -302,10 +302,8 @@ def block_generation(
         x_ext, y_ext = final_shape.exterior.xy
         ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
 
-    # if plot_control_points:
-    #     # Also plot the control points (randomized or pinned)
-    #     cpx, cpy = zip(*control_points)
-    #     ax.scatter(cpx, cpy, color='red', marker='o')
+    # cpx, cpy = zip(*control_points)
+    # ax.scatter(cpx, cpy, color='red', marker='o')
 
     # for xs, ys in zip(x_corr, y_corr):
     #     ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
@@ -314,8 +312,8 @@ def block_generation(
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=10)
-    # plt.savefig("Origin.png", bbox_inches='tight', pad_inches=0, dpi=10)
+    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=15)
+    # plt.savefig("Origin.png", bbox_inches='tight', pad_inches=0, dpi=200)
     plt.close()
 
     mask = image_to_mask_array(buf)

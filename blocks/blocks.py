@@ -53,15 +53,15 @@ class CrossBlock2D(Block):
         self.random_radius = random_radius
         self.vertical_points = np.array([
             (0, -1),   # bottom boundary
-            (0, -0.9),  # garantee perpendicular to the boundary
+            (0, -0.95),  # garantee perpendicular to the boundary
 
-            (0, 0.9),   # top boundary
+            (0, 0.95),   # top boundary
             (0, 1)])
         self.horizontal_points = np.array([
             (-1, 0),   # left boundary
-            (-0.9, 0),
+            (-0.95, 0),
 
-            (0.9, 0),   # right boundary
+            (0.95, 0),   # right boundary
             (1, 0)])
         self.outer_basic_points = np.concatenate((self.vertical_points, self.horizontal_points))
         self.vertical_inner_points = np.array([
@@ -159,9 +159,9 @@ class LBlock2D(Block):
         self.random_radius = random_radius
         self.outer_basic_points = np.array([
             (0, 1),   # left boundary
-            (0, 0.9),
+            (0, 0.95),
             
-            (0.9, 0),   # right boundary
+            (0.95, 0),   # right boundary
             (1, 0),
         ])
         self.inner_basic_points = np.array([
@@ -244,13 +244,13 @@ class TBlock2D(Block):
         self.random_radius = random_radius
         self.vertical_points = np.array([
             (0, -1),   # bottom boundary
-            (0, -0.9)  # garantee perpendicular to the boundary
+            (0, -0.95)  # garantee perpendicular to the boundary
         ])
         self.horizontal_points = np.array([
             (-1, 0),   # left boundary
-            (-0.9, 0),
+            (-0.95, 0),
 
-            (0.9, 0),   # right boundary
+            (0.95, 0),   # right boundary
             (1, 0)])
         self.outer_basic_points = np.concatenate((self.vertical_points, self.horizontal_points))
         self.vertical_inner_points = np.array([
