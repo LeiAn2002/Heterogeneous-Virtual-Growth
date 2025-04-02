@@ -37,7 +37,7 @@ match dim:
         # r_array = np.array([0.0, 0.0, 0.0, 0.0])
         # v_array = np.array([0.2, 0.2, 0.2, 0.2])
 
-        first_row_v = np.linspace(0.2, 0.7, 6)
+        first_row_v = np.linspace(0.3, 0.3, 6)
         v_array = np.tile(first_row_v, (6, 1))
         a = v_array
         b = np.hstack([v_array[:, 1:], v_array[:, -1:]])
@@ -52,9 +52,24 @@ match dim:
         # frequency_hints = np.vstack([flattened, second_third_row])
         # frequency_hints = frequency_hints.T
 
-        first_row_r = np.linspace(0.7, 0, 6)
+        first_row_r = np.linspace(1.0, 0, 6)
         r_array = np.tile(first_row_r, (6, 1))
         r_array = r_array.flatten()
+
+        # mesh_size = (1, 1)
+        # element_size = (1, 1)
+        # candidates = ["T"]
+        # num_elems = np.prod(mesh_size)
+        # frequency_hints = np.random.rand(num_elems, len(candidates))
+        # frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
+        # first_row_v = np.linspace(0.7, 0.7, 1)
+        # v_array = np.tile(first_row_v, (1, 1))
+        # a = v_array
+        # b = np.hstack([v_array[:, 1:], v_array[:, -1:]])
+        # vector_matrix = np.stack((a, b), axis=2)
+        # v_array = vector_matrix.reshape(-1, 2)
+        # r_array = np.array([0.7])
+        # v_array = np.array([0.2, 0.2, 0.2, 0.2])
 
         # d, m, n = 0.5, 0.75, 0.25
         m = 0.75
@@ -84,5 +99,4 @@ if __name__ == "__main__":
          gif_name=gif_name,
          save_mesh=True, save_mesh_path=save_path,
          save_mesh_name="symbolic_graph.npy")
-    generate_mesh()
-    print("Time elapsed: ", time.time() - start_time)
+    print("Virtual Growth Time: ", time.time() - start_time)

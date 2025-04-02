@@ -22,14 +22,16 @@ Citations:
 import numpy as np
 from homogenization.homogenization_2d import homogenized_elasticity_matrix_2d
 from homogenization.homogenization_3d import homogenized_elasticity_matrix_3d
+from blocks.block_mesh_2d import load_msh_with_meshio
+import time
 
 
+start_time = time.time()
 dim = 2
 match dim:
     case 2:
-        mesh = np.load("designs/2d/fem_mesh.npz")
-        nodes = mesh["nodes"]
-        elements = mesh["elements"]
+        mesh_file = "designs/2d/mesh.msh"
+        nodes, elements = load_msh_with_meshio(mesh_file)
         mat_table = {
             "E": 30,
             "nu": 0.25,
@@ -39,6 +41,7 @@ match dim:
         }
         K_eps = homogenized_elasticity_matrix_2d(nodes, elements, mat_table)
         print(K_eps.round(2))
+        print("2D homogenization time: ", time.time() - start_time)
     case 3:
         mesh = np.load("designs/3d/fem_mesh.npz")
         nodes = mesh["nodes"]

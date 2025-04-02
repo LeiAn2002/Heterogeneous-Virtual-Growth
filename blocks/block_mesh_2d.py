@@ -125,7 +125,7 @@ def find_contours_hierarchy(bin_img):
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     debug_prefix = "./designs/2d/"
     debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
-    cv2.drawContours(debug_img, contours, -1, (0,0,255), 2)
+    cv2.drawContours(debug_img, contours, -1, (0, 0, 255), 2)
     cv2.imwrite(debug_prefix + "contours_for_debug.png", debug_img)
     return contours, hierarchy
 
@@ -269,7 +269,7 @@ def write_geo_file_with_boolean_difference_and_periodic(
         # (B) define hole surfaces
         holeSurfIds = []
         for i, cnt in enumerate(contours):
-            for i in range(3):
+            for i in range(4):  # range 4 because we have quadrilateral elements
                 cnt = filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=min_dist_for_merge)
 
             npts = len(cnt)
@@ -429,12 +429,14 @@ def load_msh_with_meshio(msh_file):
         cdata = block.data
         # we only gather 2D cells: triangle or quad
         if ctype in ["triangle", "quad"]:
-            cells_out.append((ctype, cdata))
+            cells_out.append(cdata)
+        
+    cells_out = np.array(cells_out)
     return nodes, cells_out
 
 
 def downscale_binary_image(bin_img, 
-                           target_size=(None,None), 
+                           target_size=(None, None), 
                            scale=0.25, 
                            interpolation=cv2.INTER_AREA):
     """
@@ -467,14 +469,17 @@ def downscale_binary_image(bin_img,
     # 3) Optional threshold => ensure it's strictly 0 or 255
     # Because resize might produce values in [0..255] but not strictly 0 or 255
     # if using INTER_AREA or something else
-    # 
     # If we want a strict bin:
     _, small_bin = cv2.threshold(resized, 127, 255, cv2.THRESH_BINARY)
 
     return small_bin
 
 
-def generate_mesh():
+def generate_mesh(
+        design_path="./designs/2d/symbolic_graph.npy",
+        geo_file="./designs/2d/mesh.geo",
+        msh_file="./designs/2d/mesh.msh"
+        ):
     """
     Full pipeline demonstration.
     1. Preprocess image -> binary
@@ -485,9 +490,6 @@ def generate_mesh():
     6. Run gmsh
     7. Load .msh
     """
-    design_path = "./designs/2d/symbolic_graph.npy"  # your input
-    geo_file = "./designs/2d/mesh.geo"
-    msh_file = "./designs/2d/mesh.msh"
     bin_array = np.load(design_path)
 
     # Step 1: Preprocess
@@ -504,16 +506,21 @@ def generate_mesh():
     # simplified_contours = simplify_contours(contours, epsilon_ratio=0.00)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=20.0, flip_y=True, min_dist_for_merge=5)
+    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=20.0, flip_y=True, min_dist_for_merge=8)
 
     # Step 5: Run gmsh
-    run_gmsh(geo_file, msh_file, dim=2)
+    # run_gmsh(geo_file, msh_file, dim=2)
 
-    downscaled_bin_img = downscale_binary_image(bin_img, scale=0.5, interpolation=cv2.INTER_AREA)
-    cv2.imwrite("./designs/2d/downscaled.png", downscaled_bin_img)
-    print("Downscaled shape:", downscaled_bin_img.shape[0] * downscaled_bin_img.shape[1])
+    # downscaled_bin_img = downscale_binary_image(bin_img, scale=0.5, interpolation=cv2.INTER_AREA)
+    # cv2.imwrite("./designs/2d/downscaled.png", downscaled_bin_img)
+    # print("Downscaled shape:", downscaled_bin_img.shape[0] * downscaled_bin_img.shape[1])
 
     # Step 6: Load mesh
     # mesh = meshio.read(msh_file)
 
     # Here you could proceed with your homogenization or finite element routine.
+
+
+if __name__ == "__main__":
+    # Run the full pipeline
+    generate_mesh()

@@ -19,28 +19,26 @@ Citations:
   https://doi.org/10.1016/j.cma.2024.116864
 """
 
-import numpy as np
-from homogenization.generate_fem_mesh_2d import generate_fem_mesh_2d
-from homogenization.generate_fem_mesh_3d import generate_fem_mesh_3d
+# import numpy as np
+from blocks.block_mesh_2d import generate_mesh
+import time
 
 
+start_time = time.time()
 dim = 2
 match dim:
     case 2:
-        d, m, n = 0.5, 0.75, 0.25
-        block_size = 2 * m
-        data_path = "virtual_growth_data/2d/"
-        symbolic_graph = np.load("designs/2d/symbolic_graph.npy")
-        all_elems = np.load("virtual_growth_data/2d/all_elems.npy")
-        v_array = np.array([0.4])
-        generate_fem_mesh_2d(symbolic_graph, block_size, data_path, all_elems,
-                             v_array, mesh_path="designs/2d/",
-                             check_with_pyvista=True)
-    case 3:
-        m, n = 1.2, 0.0
-        block_size = 2 * m
-        data_path = "virtual_growth_data/3d/"
-        symbolic_graph = np.load("designs/3d/symbolic_graph.npy")
-        generate_fem_mesh_3d(
-            symbolic_graph, block_size, data_path,
-            mesh_path="designs/3d/", check_with_pyvista=True)
+        design_path = "./designs/2d/symbolic_graph.npy"  # your input
+        geo_file = "./designs/2d/mesh.geo"
+        msh_file = "./designs/2d/mesh.msh"
+        generate_mesh(design_path, geo_file, msh_file)
+        print("Mesh generation time: ", time.time() - start_time)
+
+    # case 3:
+    #     m, n = 1.2, 0.0
+    #     block_size = 2 * m
+    #     data_path = "virtual_growth_data/3d/"
+    #     symbolic_graph = np.load("designs/3d/symbolic_graph.npy")
+    #     generate_fem_mesh_3d(
+    #         symbolic_graph, block_size, data_path,
+    #         mesh_path="designs/3d/", check_with_pyvista=True)

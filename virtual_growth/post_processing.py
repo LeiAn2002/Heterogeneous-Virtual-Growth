@@ -111,7 +111,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
                     thickness_matrices[y, x, 0, 0] = avg
                     thickness_matrices[y + 1, x, 0, 1] = avg
 
-    block_size = 36
+    block_size = 55
     final_height = rows * block_size
     final_width = cols * block_size
     final_raster = np.zeros((final_height, final_width), dtype=np.uint8)
