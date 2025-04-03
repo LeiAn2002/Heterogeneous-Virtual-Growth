@@ -66,7 +66,7 @@ def filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=2.0, boundary_
             onA = is_on_boundary(pA[0], pA[1], min_x, max_x, min_y, max_y, boundary_tol)
             onB = is_on_boundary(pB[0], pB[1], min_x, max_x, min_y, max_y, boundary_tol)
 
-            if distAB < min_dist:
+            if distAB < min_dist and not (onA and onB):
                 # measure distance to bounding rect
                 dA = distance_to_rect(pA[0], pA[1], min_x, max_x, min_y, max_y)
                 dB = distance_to_rect(pB[0], pB[1], min_x, max_x, min_y, max_y)
@@ -219,8 +219,8 @@ def write_geo_file_with_boolean_difference_and_periodic(
         f.write('Mesh.CharacteristicLengthFromPoints = 0;\n')
         f.write('Mesh.CharacteristicLengthFromCurvature = 0;\n')
         f.write('Mesh.RecombineAll = 1;\n\n')
-        f.write('Mesh.RecombinationAlgorithm = 3;\n\n')
-        f.write('Mesh.ElementOrder = 1;\n\n')
+        f.write('Mesh.RecombinationAlgorithm = 2;\n\n')
+        f.write('Mesh.ElementOrder = 0;\n\n')
 
         def fy(v):
             return -v if flip_y else v
@@ -505,7 +505,7 @@ def generate_mesh(
     # simplified_contours = simplify_contours(contours, epsilon_ratio=0.00)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=20.0, flip_y=True, min_dist_for_merge=8)
+    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=20.0, flip_y=True, min_dist_for_merge=4)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)

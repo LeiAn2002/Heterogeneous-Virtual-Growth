@@ -27,8 +27,8 @@ from blocks.block_mesh_2d import generate_mesh
 dim = 2
 match dim:
     case 2:
-        mesh_number = 4
-        element_number = 2
+        mesh_number = 3
+        element_number = 1
         mesh_size = (mesh_number, mesh_number)
         element_size = (element_number, element_number)
         candidates = ["cross", "T"]
