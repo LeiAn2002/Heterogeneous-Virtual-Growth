@@ -31,7 +31,7 @@ dim = 2
 match dim:
     case 2:
         mesh_file = "designs/2d/mesh.msh"
-        nodes, elements = load_msh_with_meshio(mesh_file)
+        nodes, tri_elems, quad_elems = load_msh_with_meshio(mesh_file)
         mat_table = {
             "E": 30,
             "nu": 0.25,
@@ -39,7 +39,7 @@ match dim:
             "RegMesh": False,
             "thickness": 1.0,
         }
-        K_eps = homogenized_elasticity_matrix_2d(nodes, elements, mat_table)
+        K_eps = homogenized_elasticity_matrix_2d(nodes, tri_elems, quad_elems, mat_table)
         print(K_eps.round(2))
         print("2D homogenization time: ", time.time() - start_time)
     case 3:
