@@ -269,6 +269,7 @@ def write_geo_file_with_boolean_difference_and_periodic(
         surf_id += 1
 
         # (B) define hole surfaces
+        # min_dist_for_merge = max(abs(min_x), abs(max_x)) * 0.01
         holeSurfIds = []
         for i, cnt in enumerate(contours):
             for i in range(4):  # range 4 because we have quadrilateral elements
@@ -424,14 +425,25 @@ def load_msh_with_meshio(msh_file):
     mesh = meshio.read(msh_file)
     # mesh.points -> (N, 3)
     nodes = mesh.points.copy()
-    
-    elements = []
+
+    tri_elems = []
+    quad_elems = []
     for block in mesh.cells:
+        if block.type == "triangle":
+            tri_elems.append(block.data)
         if block.type == "quad":
-            elements = block.data
-            elements = elements[:, [0, 3, 2, 1]]
-            break
-    return nodes, elements
+            quad_elems.append(block.data)
+    if len(tri_elems) > 0:
+        tri_elems = np.vstack(tri_elems)
+        tri_elems = tri_elems[:, [0, 2, 1]]
+    else:
+        tri_elems = np.zeros((0, 3), dtype=int)
+    if len(quad_elems) > 0:
+        quad_elems = np.vstack(quad_elems)
+        quad_elems = quad_elems[:, [0, 3, 2, 1]]
+    else:
+        quad_elems = np.zeros((0, 4), dtype=int)
+    return nodes, tri_elems, quad_elems
 
 
 def downscale_binary_image(bin_img, 

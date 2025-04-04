@@ -97,9 +97,9 @@ def topology_matrices(nodes):
     return B_0, B_a, B_eps, V
 
 
-def homogenized_elasticity_matrix_2d(nodes, elements, mat_table):
+def homogenized_elasticity_matrix_2d(nodes, tri_elems, quad_elems, mat_table):
     """Compute the homogenized constitutive matrix."""
-    K_uc = global_stiffness_matrix(nodes, elements, mat_table)
+    K_uc = global_stiffness_matrix(nodes, tri_elems, quad_elems, mat_table)
     B_0, B_a, B_eps, V = topology_matrices(nodes.T)
     eps = sp.sparse.eye(B_0.shape[1]) * 1e-8  # Eliminate the singularity
     D_0 = - np.linalg.inv(B_0.T@K_uc@B_0 + eps) @ (B_0.T@K_uc@B_a)
