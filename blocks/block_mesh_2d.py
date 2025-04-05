@@ -66,7 +66,8 @@ def filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=2.0, boundary_
             onA = is_on_boundary(pA[0], pA[1], min_x, max_x, min_y, max_y, boundary_tol)
             onB = is_on_boundary(pB[0], pB[1], min_x, max_x, min_y, max_y, boundary_tol)
 
-            if distAB < min_dist and not (onA and onB):
+            # if distAB < min_dist and not (onA and onB):
+            if distAB < min_dist:
                 # measure distance to bounding rect
                 dA = distance_to_rect(pA[0], pA[1], min_x, max_x, min_y, max_y)
                 dB = distance_to_rect(pB[0], pB[1], min_x, max_x, min_y, max_y)
@@ -118,10 +119,11 @@ def find_contours_hierarchy(bin_img):
         contours (list): A list of contour arrays.
         hierarchy (np.ndarray): A (1, N, 4) array describing each contour's relations.
     """
-    # kernel_open = np.ones((3, 3), np.uint8)
+    # kernel_open = np.ones((1, 1), np.uint8)
     # kernel_close = np.ones((3, 3), np.uint8)
     # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel_open, iterations=1)
     # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel_close, iterations=1)
+    bin_img = cv2.GaussianBlur(bin_img, (5, 5), 0)
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     debug_prefix = "./designs/2d/"
     debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
@@ -272,9 +274,9 @@ def write_geo_file_with_boolean_difference_and_periodic(
         # min_dist_for_merge = max(abs(min_x), abs(max_x)) * 0.01
         holeSurfIds = []
         for i, cnt in enumerate(contours):
-            for i in range(4):  # range 4 because we have quadrilateral elements
+            for i in range(10):
                 cnt = filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=min_dist_for_merge)
-
+            # cnt = filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=2)
             npts = len(cnt)
             if npts < 2:
                 # If it becomes too short, skip
@@ -517,7 +519,7 @@ def generate_mesh(
     # simplified_contours = simplify_contours(contours, epsilon_ratio=0.00)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=20.0, flip_y=True, min_dist_for_merge=8)
+    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=5, flip_y=True, min_dist_for_merge=5)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)
