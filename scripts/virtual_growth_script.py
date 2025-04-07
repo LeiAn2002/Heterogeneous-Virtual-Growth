@@ -27,7 +27,7 @@ from blocks.block_mesh_2d import generate_mesh
 dim = 2
 match dim:
     case 2:
-        mesh_number = 6
+        mesh_number = 5
         element_number = 4
         mesh_size = (mesh_number, mesh_number)
         element_size = (element_number, element_number)
@@ -55,12 +55,12 @@ match dim:
         # r_array = np.tile(first_row_r, (mesh_number, 1))
         # r_array = r_array.flatten()
 
-        lower_boundary_v = 0.6
-        upper_boundary_v = 0.7
+        lower_boundary_v = 0.3
+        upper_boundary_v = 0.4
         v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number, 2))
 
-        lower_boundary_r = 0.6
-        upper_boundary_r = 0.7
+        lower_boundary_r = 0.9
+        upper_boundary_r = 1.0
         r_array = np.random.uniform(low=lower_boundary_r, high=upper_boundary_r, size=(mesh_number * mesh_number, ))
 
         # d, m, n = 0.5, 0.75, 0.25
