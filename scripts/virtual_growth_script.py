@@ -55,11 +55,11 @@ match dim:
         # r_array = np.tile(first_row_r, (mesh_number, 1))
         # r_array = r_array.flatten()
 
-        lower_boundary_v = 0.3
-        upper_boundary_v = 0.4
+        lower_boundary_v = 0.8
+        upper_boundary_v = 0.8
         v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number, 2))
 
-        lower_boundary_r = 0.9
+        lower_boundary_r = 1.0
         upper_boundary_r = 1.0
         r_array = np.random.uniform(low=lower_boundary_r, high=upper_boundary_r, size=(mesh_number * mesh_number, ))
 
