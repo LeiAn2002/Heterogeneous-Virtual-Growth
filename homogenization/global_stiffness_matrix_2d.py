@@ -148,7 +148,59 @@ def element_stiffness_quad(vx, vy, mat_table, D):
     return ke
 
 
-def global_stiffness_matrix(nodes, tri_elems, quad_elems, mat_table):
+def build_tri_contrib(el_id, node_ids, nodes, mat_table, D):
+    vx = nodes[node_ids, 0]
+    vy = nodes[node_ids, 1]
+    ke_tri = element_stiffness_triangle(vx, vy, mat_table, D)
+    
+    elem_dofs = []
+    for n in node_ids:
+        elem_dofs.append(2*n)
+        elem_dofs.append(2*n+1)
+    elem_dofs = np.array(elem_dofs, dtype=int)  # size=6
+    
+    row_sub = np.zeros(36, dtype=int)
+    col_sub = np.zeros(36, dtype=int)
+    data_sub = np.zeros(36, dtype=float)
+    
+    idx = 0
+    for i in range(6):
+        for j in range(6):
+            row_sub[idx] = elem_dofs[i]
+            col_sub[idx] = elem_dofs[j]
+            data_sub[idx] = ke_tri[i,j]
+            idx += 1
+    
+    return (row_sub, col_sub, data_sub)
+
+
+def build_quad_contrib(el_id, node_ids, nodes, mat_table, D):
+    vx = nodes[node_ids, 0]
+    vy = nodes[node_ids, 1]
+    ke_quad = element_stiffness_quad(vx, vy, mat_table, D)
+    
+    elem_dofs = []
+    for n in node_ids:
+        elem_dofs.append(2*n)
+        elem_dofs.append(2*n+1)
+    elem_dofs = np.array(elem_dofs, dtype=int)  # size=8
+    
+    row_sub = np.zeros(64, dtype=int)
+    col_sub = np.zeros(64, dtype=int)
+    data_sub = np.zeros(64, dtype=float)
+    
+    idx = 0
+    for i in range(8):
+        for j in range(8):
+            row_sub[idx] = elem_dofs[i]
+            col_sub[idx] = elem_dofs[j]
+            data_sub[idx] = ke_quad[i,j]
+            idx += 1
+    
+    return (row_sub, col_sub, data_sub)
+
+
+def global_stiffness_matrix(nodes, tri_elems, quad_elems, mat_table, n_jobs=16):
     """
     Global stiffness matrix.
     Element connectivity should be counterclockwise as follows.
@@ -163,48 +215,29 @@ def global_stiffness_matrix(nodes, tri_elems, quad_elems, mat_table):
 
     num_elems_tri = tri_elems.shape[0]
     num_elems_quad = quad_elems.shape[0]
-    data_size = 36*num_elems_tri + 64*num_elems_quad
-    row, col = np.zeros(data_size, dtype=int), np.zeros(data_size, dtype=int)
-    data = np.zeros(data_size)
+    tri_results = Parallel(n_jobs=n_jobs)(
+        delayed(build_tri_contrib)(el_id, tri_elems[el_id], nodes, mat_table, D)
+        for el_id in range(num_elems_tri)
+    )
+    quad_results = Parallel(n_jobs=n_jobs)(
+        delayed(build_quad_contrib)(el_id, quad_elems[el_id], nodes, mat_table, D)
+        for el_id in range(num_elems_quad)
+    )
+    all_row = []
+    all_col = []
+    all_data = []
+    for (r, c, d) in tri_results:
+        all_row.append(r)
+        all_col.append(c)
+        all_data.append(d)
+    for (r, c, d) in quad_results:
+        all_row.append(r)
+        all_col.append(c)
+        all_data.append(d)
 
-    idx_offset = 0
-    for el in range(num_elems_tri):
-        node_ids = tri_elems[el, :]
-        vx = nodes[node_ids, 0]
-        vy = nodes[node_ids, 1]
-        ke_tri = element_stiffness_triangle(vx, vy, mat_table, D)
-        elem_dofs = []
-        for n in node_ids:
-            elem_dofs.append(2*n)
-            elem_dofs.append(2*n+1)
-        elem_dofs = np.array(elem_dofs, dtype=int)
-
-        for i in range(6):
-            for j in range(6):
-                index = idx_offset + i*6 + j
-                row[index] = elem_dofs[i]
-                col[index] = elem_dofs[j]
-                data[index] = ke_tri[i, j]
-        idx_offset += 36
-
-    for el in range(num_elems_quad):
-        node_ids = quad_elems[el, :]
-        vx = nodes[node_ids, 0]
-        vy = nodes[node_ids, 1]
-        ke_quad = element_stiffness_quad(vx, vy, mat_table, D)
-        elem_dofs = []
-        for n in node_ids:
-            elem_dofs.append(2*n)
-            elem_dofs.append(2*n+1)
-        elem_dofs = np.array(elem_dofs, dtype=int)
-
-        for i in range(8):
-            for j in range(8):
-                index = idx_offset + i*8 + j
-                row[index] = elem_dofs[i]
-                col[index] = elem_dofs[j]
-                data[index] = ke_quad[i, j]
-        idx_offset += 64
+    row = np.concatenate(all_row)
+    col = np.concatenate(all_col)
+    data = np.concatenate(all_data)
 
     K_global = sparse.csc_matrix((data, (row, col)), shape=(total_dofs, total_dofs))
-    return K_global  # Sparse global stiffness matrix
+    return K_global
