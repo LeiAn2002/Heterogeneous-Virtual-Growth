@@ -21,6 +21,7 @@ Citations:
 
 import numpy as np
 from scipy import sparse
+from joblib import Parallel, delayed
 
 
 def triangle_gauss_points():

@@ -120,10 +120,10 @@ def find_contours_hierarchy(bin_img):
         hierarchy (np.ndarray): A (1, N, 4) array describing each contour's relations.
     """
     # kernel_open = np.ones((1, 1), np.uint8)
-    # kernel_close = np.ones((3, 3), np.uint8)
+    # kernel_close = np.ones((1, 1), np.uint8)
+    bin_img = cv2.GaussianBlur(bin_img, (5, 5), 0)
     # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel_open, iterations=1)
     # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel_close, iterations=1)
-    bin_img = cv2.GaussianBlur(bin_img, (5, 5), 0)
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     debug_prefix = "./designs/2d/"
     debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
@@ -215,14 +215,14 @@ def write_geo_file_with_boolean_difference_and_periodic(
         f.write('SetFactory("OpenCASCADE");\n\n')
 
         # optional mesh constraints
-        f.write('Mesh.CharacteristicLengthMax = 10;\n')
-        f.write('Mesh.CharacteristicLengthMin = 1;\n')
+        # f.write('Mesh.CharacteristicLengthMax = 10;\n')
+        # f.write('Mesh.CharacteristicLengthMin = 1;\n')
         # f.write('Mesh.CharacteristicLengthExtendFromBoundary = 1;\n')
         f.write('Mesh.CharacteristicLengthFromPoints = 0;\n')
         f.write('Mesh.CharacteristicLengthFromCurvature = 0;\n')
         f.write('Mesh.RecombineAll = 1;\n\n')
         f.write('Mesh.RecombinationAlgorithm = 5;\n\n')
-        f.write('Mesh.ElementOrder = 0;\n\n')
+        # f.write('Mesh.ElementOrder = 0;\n\n')
 
         def fy(v):
             return -v if flip_y else v
@@ -519,7 +519,7 @@ def generate_mesh(
     # simplified_contours = simplify_contours(contours, epsilon_ratio=0.00)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=5, flip_y=True, min_dist_for_merge=5)
+    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=1, flip_y=True, min_dist_for_merge=8)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)
