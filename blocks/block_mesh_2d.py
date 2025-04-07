@@ -519,7 +519,7 @@ def generate_mesh(
     # simplified_contours = simplify_contours(contours, epsilon_ratio=0.00)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=1, flip_y=True, min_dist_for_merge=8)
+    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=1, flip_y=True, min_dist_for_merge=2)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)

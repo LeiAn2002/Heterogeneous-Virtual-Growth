@@ -105,11 +105,11 @@ def homogenized_elasticity_matrix_2d(nodes, tri_elems, quad_elems, mat_table):
     K_uc = global_stiffness_matrix(nodes, tri_elems, quad_elems, mat_table)
     B_0, B_a, B_eps, V = topology_matrices(nodes.T)
     eps = sp.sparse.eye(B_0.shape[1]) * 1e-8  # Eliminate the singularity
-    B0 = sps.csc_matrix(B_0)
+    B_0 = sps.csc_matrix(B_0)
     # B_a = sps.csc_matrix(B_a)
     # B_eps = sps.csc_matrix(B_eps)
-    A = B0.T@K_uc@B0 + eps
-    F = B0.T@K_uc@B_a
+    A = B_0.T@K_uc@B_0 + eps
+    F = B_0.T@K_uc@B_a
     A = A.tocsc()
     # A_csc = A.tocsc() if not sps.isspmatrix_csc(A) else A
     # luA = spla.splu(A)
