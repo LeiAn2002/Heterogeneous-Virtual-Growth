@@ -40,6 +40,7 @@ match dim:
             "thickness": 1.0,
         }
         K_eps = homogenized_elasticity_matrix_2d(nodes, tri_elems, quad_elems, mat_table)
+        np.set_printoptions(suppress=True)
         print(K_eps.round(2))
         print("2D homogenization time: ", time.time() - start_time)
     case 3:

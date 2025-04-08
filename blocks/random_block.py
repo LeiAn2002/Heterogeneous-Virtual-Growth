@@ -158,7 +158,7 @@ def generate_random_control_points(basic_points, r, outer_count):
                 angle = random.uniform(0, 2 * np.pi)
                 cx = bx + rr * np.cos(angle)
                 cy = by + rr * np.sin(angle)
-                if abs(cx) + abs(cy) < 1.0:
+                if abs(cx) + abs(cy) <= 1.2:
                     break
         control_points.append((cx, cy))
     return control_points
@@ -274,9 +274,8 @@ def block_generation(
             x_corr.append(x_sub)
             y_corr.append(y_sub)
         count += 1
-
     # Merge all strips
-    final_shape = unary_union(shapes)
+    # final_shape = unary_union(shapes)
 
     # 3. Optionally clip by boundary box
     xmin, ymin, xmax, ymax = boundary
@@ -290,30 +289,30 @@ def block_generation(
     # x_box = [xmin, xmin, xmax, xmax, xmin]
     # y_box = [ymin, ymax, ymax, ymin, ymin]
     # ax.plot(x_box, y_box, color='black', lw=1)
-
-    if final_shape.geom_type == 'Polygon':
-        x_ext, y_ext = final_shape.exterior.xy
-        ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
-    elif final_shape.geom_type == 'MultiPolygon':
-        for poly in final_shape:
-            x_ext, y_ext = poly.exterior.xy
+    for shape in shapes:
+        if shape.geom_type == 'Polygon':
+            x_ext, y_ext = shape.exterior.xy
             ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
-    else:
-        x_ext, y_ext = final_shape.exterior.xy
-        ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
+        elif shape.geom_type == 'MultiPolygon':
+            for poly in shape:
+                x_ext, y_ext = poly.exterior.xy
+                ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
+        else:
+            x_ext, y_ext = shape.exterior.xy
+            ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
 
-    # cpx, cpy = zip(*control_points)
-    # ax.scatter(cpx, cpy, color='red', marker='o')
+    cpx, cpy = zip(*control_points)
+    ax.scatter(cpx, cpy, color='red', marker='o')
 
-    # for xs, ys in zip(x_corr, y_corr):
-    #     ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
+    for xs, ys in zip(x_corr, y_corr):
+        ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
 
     ax.set_aspect('equal', 'box')
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=15)
-    # plt.savefig("Origin.png", bbox_inches='tight', pad_inches=0, dpi=200)
+    # plt.savefig("Origin.png", bbox_inches='tight', pad_inches=0, dpi=15)
     plt.close()
 
     mask = image_to_mask_array(buf)
@@ -322,7 +321,7 @@ def block_generation(
 
     mask = heaviside(mask, beta=256)
 
-    mask = binary_fill_holes(mask)
+    # mask = binary_fill_holes(mask)
 
     return mask
 
