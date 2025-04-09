@@ -409,7 +409,7 @@ def run_gmsh(geo_file, msh_file="/design/2d/fem_mesh.msh", dim=2):
     """
     cmd = ["gmsh", geo_file, f"-{dim}", "-o", msh_file]
     print("[Cmd]", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
     print(f"[+] Generated mesh file with periodic edges => {msh_file}")
 
 
