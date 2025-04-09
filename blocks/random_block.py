@@ -22,14 +22,9 @@ def image_to_mask_array(png_file, threshold=10):
         threshold: Tolerance level for color classification.
     """
     img = Image.open(png_file).convert('RGB') 
-    arr = np.array(img) 
-    H, W, _ = arr.shape
-    mask = np.zeros((H, W), dtype=np.uint8)
-    for y in range(H):
-        for x in range(W):
-            r, g, b = arr[y, x]
-            if not (abs(r-255) < threshold and abs(g-255) < threshold and abs(b-255) < threshold):
-                mask[y, x] = 1
+    arr = np.array(img).astype(np.int16)
+    diff = np.abs(arr - 255)
+    mask = (diff > threshold).any(axis=2).astype(np.uint8)
     return mask
 
 
