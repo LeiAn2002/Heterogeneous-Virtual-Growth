@@ -1,6 +1,5 @@
 import numpy as np
 import random
-import matplotlib.pyplot as plt
 import matplotlib
 import io
 
@@ -9,11 +8,8 @@ from shapely.ops import unary_union
 from scipy.interpolate import make_interp_spline
 from PIL import Image
 from utils.linear_and_heaviside_filter import linear_filter, heaviside
-from rasterio.features import rasterize
-from affine import Affine
-from matplotlib.collections import PolyCollection
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-
+import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
 
 def image_to_mask_array(png_file, threshold=10):
     """
@@ -107,7 +103,11 @@ def generate_bspline_curve(points, num_samples=500):
     xs = []
     ys = []
     for i in range(n - 1):
-        t_sub = np.linspace(i, i + 1, num_samples)
+        x = np.linspace(0, np.pi, num_samples)
+        y = (1 - np.cos(x)) / 2
+        y = y**1.25
+        t_sub = y + i
+        # t_sub = np.linspace(i, i + 1, num_samples)
         xy_sub = spline(t_sub)
         x_sub = xy_sub[:, 0]
         y_sub = xy_sub[:, 1]
@@ -143,6 +143,7 @@ def modify_thickness_with_vf(thickness, vf):
     return modified_thickness
 
 
+# @profile
 def thicken_curve(xs, ys, forbidden_edges, vf, cap_style="flat"):
     """
     Thicken a curve (represented by sampled points) into a strip with the specified thickness.
@@ -196,7 +197,7 @@ def block_generation(
         sub_ctrls = [control_points[i] for i in subset]
         forbidden_edges = forbidden_edges_set[count]
         v = vf[count]
-        xs, ys = generate_bspline_curve(sub_ctrls, num_samples=100)
+        xs, ys = generate_bspline_curve(sub_ctrls, num_samples=50)
         for i in range(len(xs)):
             x_sub = xs[i]
             y_sub = ys[i]
@@ -288,9 +289,9 @@ def block_generation(
     # )
     # ax.add_collection(poly_coll)
     for shape in unioned_shapes:
+        shape = shape.simplify(0.1, preserve_topology=True)
         x_ext, y_ext = shape.exterior.xy
-        ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
-
+        ax.fill(x_ext, y_ext, color='skyblue', alpha=1.0)
     ax.set_aspect('equal', 'box')
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
