@@ -285,8 +285,13 @@ def block_generation(
     # ax.add_collection(poly_coll)
     for shape in unioned_shapes:
         shape = shape.simplify(0.1, preserve_topology=True)
-        x_ext, y_ext = shape.exterior.xy
-        ax.fill(x_ext, y_ext, color='skyblue', alpha=1.0)
+        if shape.geom_type == 'Polygon':
+            x_ext, y_ext = shape.exterior.xy
+            ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
+        elif shape.geom_type == 'MultiPolygon':
+            for poly in shape.geoms:
+                x_ext, y_ext = poly.exterior.xy
+                ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
     ax.set_aspect('equal', 'box')
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
