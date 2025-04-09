@@ -1,103 +1,18 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-import time
+import matplotlib
 import io
 
 from shapely.geometry import LineString
 from shapely.ops import unary_union
 from scipy.interpolate import make_interp_spline
-from scipy.sparse import coo_matrix
-from scipy.ndimage import binary_fill_holes
 from PIL import Image
-
-
-def build_filter_matrix(H, W, r):
-    """
-    Build a sparse matrix for a 2D 'linear filter' of radius r on a (H x W) grid.
-    Each row e corresponds to one pixel (y, x).
-    Each column i also corresponds to one pixel.
-    The entry (e, i) = max(0, r - dist(e,i)) if dist(e,i) < r, else 0.
-
-    Returns:
-        H_sp: sparse matrix of shape [N, N], N = H*W
-        row_sum: an array of row sums (for normalizing).
-    """
-    # We'll flatten pixel index as e = y*W + x
-    # Helper function: 2D->1D
-    def idx(x, y):
-        return y*W + x
-
-    row_idx = []
-    col_idx = []
-    data = []
-
-    r_int = int(np.ceil(r))
-    for y in range(H):
-        for x in range(W):
-            e = idx(x, y)
-
-            # local window in [x-r_int, x+r_int] etc
-            x_min = max(0, x - r_int)
-            x_max = min(W-1, x + r_int)
-            y_min = max(0, y - r_int)
-            y_max = min(H-1, y + r_int)
-
-            for yy in range(y_min, y_max+1):
-                for xx in range(x_min, x_max+1):
-                    dist = np.sqrt((xx - x)**2 + (yy - y)**2)
-                    if dist < r:
-                        w = r - dist
-                        col = idx(xx, yy)
-                        row_idx.append(e)
-                        col_idx.append(col)
-                        data.append(w)
-
-    N = H * W
-    H_coo = coo_matrix((data, (row_idx, col_idx)), shape=(N, N), dtype=np.float32)
-    H_sp = H_coo.tocsr()
-    row_sum = np.array(H_sp.sum(axis=1)).ravel()  # shape=(N,)
-    return H_sp, row_sum
-
-
-def linear_filter(mask, r, H_sp=None, row_sum=None):
-    """
-    Apply a radius-r linear filter to the mask using the sparse matrix approach.
-    If H_sp and row_sum are not given, we'll build them on the fly (slower).
-
-    mask: 2D numpy array (H x W)
-    r:    filter radius (float)
-    H_sp, row_sum: optional precomputed filter matrix and row sums.
-
-    Returns:
-        new_mask: 2D array of same shape, filtered by the linear kernel.
-    """
-    H, W = mask.shape
-    N = H*W
-    # flatten mask
-    x_vec = mask.reshape(-1).astype(np.float32)
-
-    # Build filter matrix if not provided
-    if H_sp is None or row_sum is None:
-        H_sp, row_sum = build_filter_matrix(H, W, r)
-
-    # multiply
-    x_filtered = H_sp.dot(x_vec)
-    # row-wise normalize
-    with np.errstate(divide='ignore', invalid='ignore'):
-        x_filtered /= row_sum
-
-    # reshape
-    new_mask = x_filtered.reshape(H, W)
-    return new_mask
-
-
-def heaviside(mask, beta=32):
-    """
-    Apply a Heaviside function to the mask.
-    The Heaviside function is approximated by a sigmoid with slope beta.
-    """
-    return (np.tanh(beta * 0.5) + np.tanh(beta * (mask - 0.5))) / (2 * np.tanh(beta * 0.5))
+from utils.linear_and_heaviside_filter import linear_filter, heaviside
+from rasterio.features import rasterize
+from affine import Affine
+from matplotlib.collections import PolyCollection
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 
 def image_to_mask_array(png_file, threshold=10):
@@ -122,21 +37,34 @@ def image_to_mask_array(png_file, threshold=10):
     return mask
 
 
-def point_to_segment_distance(px, py, x1, y1, x2, y2):
+def point_to_segment_distance(xs, ys, x1, y1, x2, y2):
     """
-    Compute the nearest distance between a point and a line segment.
-    The line segment is defined by two points (x1, y1) and (x2, y2).
+    Batch calculate the distance from a set of points (xs, ys) to a line segment (x1, y1)-(x2, y2).
+    Return a one-dimensional array of the same length as xs/ys.
     """
-    segment_vec = np.array([x2 - x1, y2 - y1])
-    point_vec = np.array([px - x1, py - y1])
+    xs = np.asarray(xs, dtype=float)
+    ys = np.asarray(ys, dtype=float)
 
-    segment_length_sq = np.dot(segment_vec, segment_vec)
-    if segment_length_sq == 0:
-        return np.linalg.norm(point_vec)
-    t = np.dot(point_vec, segment_vec) / segment_length_sq
-    t = max(0, min(1, t))
-    nearest = np.array([x1, y1]) + t * segment_vec
-    return np.linalg.norm(np.array([px, py]) - nearest)
+    seg_vec = np.array([x2 - x1, y2 - y1], dtype=float)
+    seg_len_sq = seg_vec.dot(seg_vec)
+
+    if seg_len_sq == 0.0:
+        dx = xs - x1
+        dy = ys - y1
+        return np.sqrt(dx*dx + dy*dy)
+
+    dx = xs - x1
+    dy = ys - y1
+    t = (dx * seg_vec[0] + dy * seg_vec[1]) / seg_len_sq
+
+    t = np.clip(t, 0.0, 1.0)
+
+    nearest_x = x1 + t * seg_vec[0]
+    nearest_y = y1 + t * seg_vec[1]
+
+    dist_x = xs - nearest_x
+    dist_y = ys - nearest_y
+    return np.sqrt(dist_x*dist_x + dist_y*dist_y)
 
 
 def generate_random_control_points(basic_points, r, outer_count):
@@ -190,17 +118,18 @@ def generate_bspline_curve(points, num_samples=500):
 
 def get_original_thickness(xs, ys, forbidden_edges):
     """
-    Compute the thickness of a strip at each point.
-    The thickness is the minimum distance to any forbidden edge.
+    Calculate the minimum distance from each point (xs, ys) to all forbidden_edges.
+    Use vectorization to process points in batches at once, greatly reducing Python loop overhead.
     """
-    thicknesses = []
-    for x, y in zip(xs, ys):
-        min_dist = min(
-            point_to_segment_distance(x, y, *edge)
-            for edge in forbidden_edges
-        )
-        thicknesses.append(min_dist)
-    return thicknesses
+    xs = np.asarray(xs, dtype=float)
+    ys = np.asarray(ys, dtype=float)
+    thicknesses = np.full_like(xs, np.inf, dtype=float)
+
+    for (x1, y1, x2, y2) in forbidden_edges:
+        dists = point_to_segment_distance(xs, ys, x1, y1, x2, y2)
+        thicknesses = np.minimum(thicknesses, dists)
+
+    return thicknesses.tolist()
 
 
 def modify_thickness_with_vf(thickness, vf):
@@ -232,10 +161,12 @@ def thicken_curve(xs, ys, forbidden_edges, vf, cap_style="flat"):
         seg_poly = seg_line.buffer(t, resolution=32, cap_style=cap_style)
         segment_polys.append(seg_poly)
 
-    final_strip = unary_union(segment_polys)
-    return final_strip
+    # final_strip = unary_union(segment_polys)
+    # return final_strip
+    return segment_polys
 
 
+# @profile
 def block_generation(
     basic_points,
     outer_count,
@@ -256,11 +187,12 @@ def block_generation(
     control_points = generate_random_control_points(basic_points, r, outer_count)
     
     # 2. Build and thicken each sub-curve
-    shapes = []
     count = 0
     x_corr = []
     y_corr = []
+    unioned_shapes = []
     for subset in curve_definitions:
+        shapes = []
         sub_ctrls = [control_points[i] for i in subset]
         forbidden_edges = forbidden_edges_set[count]
         v = vf[count]
@@ -270,42 +202,94 @@ def block_generation(
             y_sub = ys[i]
             v_sub = [v[i], v[i+1]]
             shape_poly = thicken_curve(x_sub, y_sub, forbidden_edges, v_sub, cap_style="flat")
-            shapes.append(shape_poly)
+            shapes += shape_poly
+            # shapes.append(shape_poly)
             x_corr.append(x_sub)
             y_corr.append(y_sub)
         count += 1
+        unioned_shapes.append(unary_union(shapes))
+
     # Merge all strips
     # final_shape = unary_union(shapes)
-
     # 3. Optionally clip by boundary box
+    # xmin, ymin, xmax, ymax = boundary
+    # bounding_box = box(xmin, ymin, xmax, ymax)
+    # clipped_shape = final_shape.intersection(bounding_box)
+
+    # 4. Plot
+    # fig, ax = plt.subplots()
+    # ax.axis("off")
+    # # Plot bounding box for reference
+    # # x_box = [xmin, xmin, xmax, xmax, xmin]
+    # # y_box = [ymin, ymax, ymax, ymin, ymin]
+    # # ax.plot(x_box, y_box, color='black', lw=1)
+    # for shape in shapes:
+    #     if shape.geom_type == 'Polygon':
+    #         x_ext, y_ext = shape.exterior.xy
+    #         ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
+    #     elif shape.geom_type == 'MultiPolygon':
+    #         for poly in shape:
+    #             x_ext, y_ext = poly.exterior.xy
+    #             ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
+    #     else:
+    #         x_ext, y_ext = shape.exterior.xy
+    #         ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
+
+    # cpx, cpy = zip(*control_points)
+    # ax.scatter(cpx, cpy, color='red', marker='o')
+
+    # for xs, ys in zip(x_corr, y_corr):
+    #     ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
+
+    # ax.set_aspect('equal', 'box')
+    # ax.set_xlim(xmin, xmax)
+    # ax.set_ylim(ymin, ymax)
+    # buf = io.BytesIO()
+    # plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=15)
+    # # plt.savefig("Origin.png", bbox_inches='tight', pad_inches=0, dpi=15)
+    # plt.close()
+
+    # mask = image_to_mask_array(buf)
+
     xmin, ymin, xmax, ymax = boundary
     # bounding_box = box(xmin, ymin, xmax, ymax)
     # clipped_shape = final_shape.intersection(bounding_box)
 
     # 4. Plot
+    # matplotlib.use('Agg')
+    # plt.ioff()
     fig, ax = plt.subplots()
     ax.axis("off")
     # Plot bounding box for reference
     # x_box = [xmin, xmin, xmax, xmax, xmin]
     # y_box = [ymin, ymax, ymax, ymin, ymin]
     # ax.plot(x_box, y_box, color='black', lw=1)
-    for shape in shapes:
-        if shape.geom_type == 'Polygon':
-            x_ext, y_ext = shape.exterior.xy
-            ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
-        elif shape.geom_type == 'MultiPolygon':
-            for poly in shape:
-                x_ext, y_ext = poly.exterior.xy
-                ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
-        else:
-            x_ext, y_ext = shape.exterior.xy
-            ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
+    # polys = []
+    # for shape in shapes:
+    #     if shape.geom_type == 'Polygon':
+    #         x_ext, y_ext = shape.exterior.xy
+    #         coords = list(zip(x_ext, y_ext))
+    #         polys.append(coords)
+    #     elif shape.geom_type == 'MultiPolygon':
+    #         for poly in shape:
+    #             x_ext, y_ext = poly.exterior.xy
+    #             coords = list(zip(x_ext, y_ext))
+    #             polys.append(coords)
+    #     else:
+    #         x_ext, y_ext = shape.exterior.xy
+    #         coords = list(zip(x_ext, y_ext))
+    #         polys.append(coords)
 
-    cpx, cpy = zip(*control_points)
-    ax.scatter(cpx, cpy, color='red', marker='o')
-
-    for xs, ys in zip(x_corr, y_corr):
-        ax.plot(xs, ys, 'k-', alpha=0.5)  # plot the curves
+    # poly_coll = PolyCollection(
+    #     [coords],
+    #     facecolor='skyblue',
+    #     alpha=0.7,
+    #     edgecolor='none'
+    # )
+    # ax.add_collection(poly_coll)
+    for shape in unioned_shapes:
+        x_ext, y_ext = shape.exterior.xy
+        ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
 
     ax.set_aspect('equal', 'box')
     ax.set_xlim(xmin, xmax)
@@ -320,8 +304,6 @@ def block_generation(
     mask = linear_filter(mask, r_filter)
 
     mask = heaviside(mask, beta=256)
-
-    # mask = binary_fill_holes(mask)
 
     return mask
 
