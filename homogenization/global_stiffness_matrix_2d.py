@@ -200,7 +200,7 @@ def build_quad_contrib(el_id, node_ids, nodes, mat_table, D):
     return (row_sub, col_sub, data_sub)
 
 
-def global_stiffness_matrix(nodes, tri_elems, quad_elems, mat_table, n_jobs=16):
+def global_stiffness_matrix(nodes, tri_elems, quad_elems, mat_table, n_jobs=32):
     """
     Global stiffness matrix.
     Element connectivity should be counterclockwise as follows.
