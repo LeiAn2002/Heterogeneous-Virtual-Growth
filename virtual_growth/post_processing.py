@@ -23,7 +23,7 @@ from collections import Counter
 import numpy as np
 import pyvista
 import matplotlib.pyplot as plt
-from blocks.random_block import linear_filter, heaviside
+from utils.linear_and_heaviside_filter import linear_filter, heaviside
 from matplotlib.colors import ListedColormap
 
 from utils.remove_repeated_nodes import remove_repeated_nodes
@@ -144,7 +144,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             color_label_matrix[y, x] = label_id
             k += 1
     final_raster = linear_filter(final_raster, 3)
-    final_raster = heaviside(final_raster, 128)
+    final_raster = heaviside(final_raster, 512)
 
     colored_final_raster = final_raster.copy()
 
@@ -164,7 +164,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
 
     cmap = ListedColormap(color_list)
 
-    plt.figure(figsize=(8, 8))
+    plt.figure(figsize=(32, 32))
     plt.axis("off")
     plt.imshow(colored_final_raster, cmap=cmap, origin="upper")
     if save_path:
