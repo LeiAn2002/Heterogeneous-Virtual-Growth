@@ -162,7 +162,7 @@ def thicken_curve(xs, ys, forbidden_edges, vf, cap_style="flat"):
     return segment_polys
 
 
-# @profile
+@profile
 def block_generation(
     basic_points,
     outer_count,
