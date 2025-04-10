@@ -11,6 +11,6 @@ export MKL_NUM_THREADS=32
 module load anaconda3/2024.10
 eval "$(conda shell.bash hook)"
 conda activate virtualgrowth
-kernprof -l -v scripts/virtual_growth_script.py
+python3 scripts/virtual_growth_script.py
 python3 scripts/generate_mesh_script.py
 python3 scripts/homogenize_script.py
