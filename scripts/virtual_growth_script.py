@@ -58,7 +58,7 @@ match dim:
         # r_array = r_array.flatten()
 
         lower_boundary_v = 0.2
-        upper_boundary_v = 0.7
+        upper_boundary_v = 0.3
         v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number, 2))
 
         lower_boundary_r = 0
