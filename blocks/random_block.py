@@ -77,7 +77,7 @@ def generate_random_control_points(basic_points, r, outer_count):
                 angle = random.uniform(0, 2 * np.pi)
                 cx = bx + rr * np.cos(angle)
                 cy = by + rr * np.sin(angle)
-                if abs(cx) + abs(cy) <= 1.2:
+                if abs(cx) + abs(cy) <= 1.0:
                     break
         control_points.append((cx, cy))
     return control_points
@@ -284,7 +284,7 @@ def block_generation(
     # )
     # ax.add_collection(poly_coll)
     for shape in unioned_shapes:
-        # shape = shape.simplify(0.1, preserve_topology=True)
+        shape = shape.simplify(0.1, preserve_topology=True)
         if shape.geom_type == 'Polygon':
             x_ext, y_ext = shape.exterior.xy
             ax.fill(x_ext, y_ext, color='skyblue', alpha=0.7)
