@@ -25,6 +25,7 @@ import pyvista
 import matplotlib.pyplot as plt
 from utils.linear_and_heaviside_filter import linear_filter, heaviside
 from matplotlib.colors import ListedColormap
+from skimage.morphology import remove_small_holes
 
 from utils.remove_repeated_nodes import remove_repeated_nodes
 
@@ -145,6 +146,9 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             k += 1
     final_raster = linear_filter(final_raster, 4)
     final_raster = heaviside(final_raster, 512)
+    # final_raster = final_raster.astype(bool)
+    # final_raster = remove_small_holes(final_raster, area_threshold=100)
+    # final_raster = final_raster.astype(float)
 
     colored_final_raster = final_raster.copy()
 

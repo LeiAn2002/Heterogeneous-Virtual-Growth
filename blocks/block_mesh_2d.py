@@ -63,8 +63,8 @@ def filter_close_points(cnt, min_x, max_x, min_y, max_y, min_dist=2.0, boundary_
             dy = pA[1] - pB[1]
             distAB = math.hypot(dx, dy)
 
-            onA = is_on_boundary(pA[0], pA[1], min_x, max_x, min_y, max_y, boundary_tol)
-            onB = is_on_boundary(pB[0], pB[1], min_x, max_x, min_y, max_y, boundary_tol)
+            # onA = is_on_boundary(pA[0], pA[1], min_x, max_x, min_y, max_y, boundary_tol)
+            # onB = is_on_boundary(pB[0], pB[1], min_x, max_x, min_y, max_y, boundary_tol)
 
             # if distAB < min_dist and not (onA and onB):
             if distAB < min_dist:
@@ -125,10 +125,10 @@ def find_contours_hierarchy(bin_img):
     # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, kernel_open, iterations=1)
     # bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel_close, iterations=1)
     contours, hierarchy = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    debug_prefix = "./designs/2d/"
-    debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
-    cv2.drawContours(debug_img, contours, -1, (0, 0, 255), 2)
-    cv2.imwrite(debug_prefix + "contours_for_debug.png", debug_img)
+    # debug_prefix = "./designs/2d/"
+    # debug_img = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
+    # cv2.drawContours(debug_img, contours, -1, (0, 0, 255), 2)
+    # cv2.imwrite(debug_prefix + "contours_for_debug.png", debug_img)
     return contours, hierarchy
 
 
@@ -219,9 +219,9 @@ def write_geo_file_with_boolean_difference_and_periodic(
         # f.write('Mesh.CharacteristicLengthMin = 1;\n')
         # f.write('Mesh.CharacteristicLengthExtendFromBoundary = 1;\n')
         f.write('Mesh.CharacteristicLengthFromPoints = 0;\n')
-        f.write('Mesh.CharacteristicLengthFromCurvature = 0;\n')
-        f.write('Mesh.RecombineAll = 1;\n\n')
-        f.write('Mesh.RecombinationAlgorithm = 5;\n\n')
+        f.write('Mesh.CharacteristicLengthFromCurvature = 1;\n')
+        f.write('Mesh.RecombineAll = 0;\n\n')
+        f.write('Mesh.RecombinationAlgorithm = 1;\n\n')
         # f.write('Mesh.ElementOrder = 0;\n\n')
 
         def fy(v):
@@ -516,10 +516,10 @@ def generate_mesh(
         return
 
     # Step 3: Simplify polygons
-    # simplified_contours = simplify_contours(contours, epsilon_ratio=0.00)
+    # simplified_contours = simplify_contours(contours, epsilon_ratio=0.02)
 
     # Step 4: Write .geo
-    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=1, flip_y=True, min_dist_for_merge=8)
+    write_geo_file_with_boolean_difference_and_periodic(contours, geo_file, lc=0.01, flip_y=True, min_dist_for_merge=5)
 
     # Step 5: Run gmsh
     run_gmsh(geo_file, msh_file, dim=2)

@@ -192,7 +192,7 @@ def block_generation(
         sub_ctrls = [control_points[i] for i in subset]
         forbidden_edges = forbidden_edges_set[count]
         v = vf[count]
-        xs, ys = generate_bspline_curve(sub_ctrls, num_samples=50)
+        xs, ys = generate_bspline_curve(sub_ctrls, num_samples=100)
         for i in range(len(xs)):
             x_sub = xs[i]
             y_sub = ys[i]

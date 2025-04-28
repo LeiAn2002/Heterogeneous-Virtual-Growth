@@ -111,8 +111,6 @@ def homogenized_elasticity_matrix_2d(nodes, tri_elems, quad_elems, mat_table):
     A = B_0.T@K_uc@B_0 + eps
     F = B_0.T@K_uc@B_a
     A = A.tocsc()
-    # A_csc = A.tocsc() if not sps.isspmatrix_csc(A) else A
-    # luA = spla.splu(A)
     D_0 = np.zeros_like(F.toarray() if sps.issparse(F) else F)
     F_arr = F.toarray() if sps.issparse(F) else F
     for j in range(F_arr.shape[1]):

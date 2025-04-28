@@ -1,0 +1,3 @@
+python3 scripts/virtual_growth_script.py
+python3 scripts/generate_mesh_script.py
+python3 scripts/homogenize_script.py
