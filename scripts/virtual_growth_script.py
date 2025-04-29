@@ -27,9 +27,10 @@ import time
 from dolfinx import io
 from scripts.project_script import load_field_from_h5
 
-mesh_number = 50
+# mesh_number = 50
 element_number = 2
-mesh_size = (mesh_number, mesh_number)
+# mesh_size = (mesh_number, mesh_number)
+mesh_size = (30, 90)
 element_size = (element_number, element_number)
 candidates = ["cross", "T", "O"]
 num_elems = np.prod(mesh_size)
@@ -70,11 +71,11 @@ fig_name = "symbolic_graph.jpg"
 gif_name = "symbolic_graph.gif"
 block_names = ["cross", "T", "O"]
 
-input_files = ["./datas/data_mechanism_rho/data_after_project/rho_field_DG0.xdmf",
-               "./datas/data_mechanism_rho/data_after_project/ksi_field_1_DG0.xdmf",
-               "./datas/data_mechanism_rho/data_after_project/ksi_field_2_DG0.xdmf",
-               "./datas/data_mechanism_rho/data_after_project/ksi_field_3_DG0.xdmf",
-               "./datas/data_mechanism_rho/data_after_project/vf_field_DG0.xdmf"]  # list your files here
+input_files = ["./datas/data_beam/data_after_project/rho_field_DG0.xdmf",
+               "./datas/data_beam/data_after_project/ksi_field_1_DG0.xdmf",
+               "./datas/data_beam/data_after_project/ksi_field_2_DG0.xdmf",
+               "./datas/data_beam/data_after_project/ksi_field_3_DG0.xdmf",
+               "./datas/data_beam/data_after_project/vf_field_DG0.xdmf"]  # list your files here
 
 value_list = []
 for xfile in input_files:
@@ -92,7 +93,7 @@ for xfile in input_files:
     value_list.append(f_src)
 
 rho_field = value_list[0].x.array
-void = np.where(rho_field < 0.2)[0]
+void = np.where(rho_field < 0.1)[0]
 # void = None
 frequency_hints_list = []
 for i in range(len(candidates)):
@@ -111,9 +112,17 @@ v_array = np.vstack((v-0.05, v+0.05)).T
 if __name__ == "__main__":
     start_time = time.time()
     main(mesh_size, element_size, candidates, frequency_hints, v_array, r_array, m, void,
-         periodic=True, num_tries=40, print_frequency=True, make_figure=True,
+         periodic=True, num_tries=40, print_frequency=False, make_figure=True,
          make_gif=False, color="#96ADFC", save_path=save_path, fig_name=fig_name,
          gif_name=gif_name,
          save_mesh=True, save_mesh_path=save_path,
          save_mesh_name="symbolic_graph.npy")
     print("Virtual Growth Time: ", time.time() - start_time)
+
+# rho_field = rho_field.reshape(30, 90)
+# # # rho_field = np.argsort(mesh_sequ)
+# import matplotlib.pyplot as plt
+# plt.imshow(rho_field, origin="lower", cmap="RdBu")
+# plt.colorbar()
+# plt.title("Sorted Field Data")
+# plt.savefig("rho_field.png")
