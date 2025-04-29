@@ -87,6 +87,7 @@ class VirtualGrowthEngine:
         v_array,
         r_array,
         m,
+        void=None,
         periodic=True,
         num_tries=1,
         print_frequency=True,
@@ -120,7 +121,10 @@ class VirtualGrowthEngine:
             raise ValueError("Dimensions of mesh and element are incompatible.")
 
         # Compute some parameters
-        self._prepare_dimensions(mesh_size, elem_size)
+        self._prepare_dimensions(mesh_size, elem_size, void)
+        if void is not None:
+            self.num_cells = self.num_cells - len(void)
+            # self.num_elems = self.num_elems - len(void)
 
         names = self.names
         rules = self.rules
@@ -157,6 +161,11 @@ class VirtualGrowthEngine:
 
                 block_count = np.zeros((self.num_elems, len(aug_candidates)))
                 fill_sequence = np.zeros(self.num_cells)
+
+                if void is not None:
+                    full_mesh_flat = full_mesh.flatten()
+                    full_mesh_flat[void] = -2
+                    full_mesh[:] = full_mesh_flat.reshape(full_mesh.shape)
 
                 self._growth_attempt(
                     full_mesh,
@@ -204,7 +213,8 @@ class VirtualGrowthEngine:
             save_mesh,
             save_mesh_path,
             save_mesh_name,
-            gif_name
+            gif_name,
+            void,
         )
 
     def _growth_attempt(
@@ -396,35 +406,45 @@ class VirtualGrowthEngine:
         save_mesh,
         save_mesh_path,
         save_mesh_name,
-        gif_name
+        gif_name,
+        void,
     ):
         """
         Computes final frequency distribution, decodes the mesh, and does optional plotting and GIF creation.
         """
-        final_frequency = compute_final_frequency(block_count, self.num_elems, aug_candidates, candidates)
+        # final_frequency = compute_final_frequency(block_count, self.num_elems-len(void), aug_candidates, candidates)
 
 
-        if (make_figure or make_gif) and save_path != "" and not os.path.exists(save_path):
-            os.makedirs(save_path)
+        # if (make_figure or make_gif) and save_path != "" and not os.path.exists(save_path):
+        #     os.makedirs(save_path)
 
-        if save_mesh and save_mesh_path != "" and not os.path.exists(save_mesh_path):
-            os.makedirs(save_mesh_path)
+        # if save_mesh and save_mesh_path != "" and not os.path.exists(save_mesh_path):
+        #     os.makedirs(save_mesh_path)
 
-        if print_frequency:
-            print("Input frequency hints of candidate blocks:")
-            with np.printoptions(precision=4):
-                print(frequency_hints)
-            print("Final frequency distribution of candidate blocks:")
-            with np.printoptions(precision=4):
-                print(final_frequency)
+        # if print_frequency:
+        #     print("Input frequency hints of candidate blocks:")
+        #     with np.printoptions(precision=4):
+        #         print(frequency_hints)
+        #     print("Final frequency distribution of candidate blocks:")
+        #     with np.printoptions(precision=4):
+        #         print(final_frequency)
 
-        freq_error = np.linalg.norm(final_frequency - frequency_hints, 2) / self.num_elems
-        print(f"2-norm error of frequency distribution: {freq_error:.3g}")
+        # freq_error = np.linalg.norm(final_frequency - frequency_hints, 2) / self.num_elems-len(void)
+        # print(f"2-norm error of frequency distribution: {freq_error:.3g}")
 
         # Decode the mesh
         idx = full_mesh.flatten().astype(int)
-        full_mesh = self.names[idx].reshape(full_mesh.shape)
+        # full_mesh = self.names[idx].reshape(full_mesh.shape)
 
+        neg_mask = idx < 0
+
+        if neg_mask.any():
+            names_with_void = np.append(self.names, "void 0")
+            idx[neg_mask] = len(self.names)
+            full_mesh = names_with_void[idx].reshape(full_mesh.shape)
+        else:
+            full_mesh = self.names[idx].reshape(full_mesh.shape)
+        
         # If you want to produce figures or GIF, call plot functions
         if make_figure:
             # Example 2D call:
@@ -436,7 +456,7 @@ class VirtualGrowthEngine:
         if make_gif:
             plot_microstructure_gif()  # 需要修改！！！！！
 
-    def _prepare_dimensions(self, mesh_size, elem_size):
+    def _prepare_dimensions(self, mesh_size, elem_size, void):
         """
         Compute self.dim, self.num_cells_x/y/z, self.num_elems, etc. for 2D or 3D.
         """

@@ -62,7 +62,7 @@ def periodic_boundary(A):
 
 
 def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
-                           v_array, r_array, periodic, solid=[], void=[], color="#96ADFC",
+                           v_array, r_array, periodic, color="#96ADFC",
                            save_path="", fig_name="microstructure.jpg"):
     rows, cols = full_mesh.shape
 
@@ -74,6 +74,8 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
         for x in range(full_mesh.shape[1]):
             block = full_mesh[y][x]
             parent = block[:block.index(" ")]
+            if parent == "void":
+                continue
             suffix_str = block[block.index(" ") + 1:]
             rotation = int(suffix_str)
             elem_id = all_elems[k]
@@ -90,13 +92,15 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
         for y in range(rows_periodic_matrix):
             for x in range(cols_periodic_matrix):
                 if x < cols_periodic_matrix - 1:
-                    avg = (periodic_thickness_matrices[y, x, 1, 1] + periodic_thickness_matrices[y, x + 1, 1, 0]) / 2
-                    periodic_thickness_matrices[y, x, 1, 1] = avg
-                    periodic_thickness_matrices[y, x + 1, 1, 0] = avg
+                    if periodic_thickness_matrices[y, x, 1, 1] != 0 and periodic_thickness_matrices[y, x + 1, 1, 0] != 0:
+                        avg = (periodic_thickness_matrices[y, x, 1, 1] + periodic_thickness_matrices[y, x + 1, 1, 0]) / 2
+                        periodic_thickness_matrices[y, x, 1, 1] = avg
+                        periodic_thickness_matrices[y, x + 1, 1, 0] = avg
                 if y < rows_periodic_matrix - 1:
-                    avg = (periodic_thickness_matrices[y, x, 0, 0] + periodic_thickness_matrices[y + 1, x, 0, 1]) / 2
-                    periodic_thickness_matrices[y, x, 0, 0] = avg
-                    periodic_thickness_matrices[y + 1, x, 0, 1] = avg
+                    if periodic_thickness_matrices[y, x, 0, 0] != 0 and periodic_thickness_matrices[y + 1, x, 0, 1] != 0:
+                        avg = (periodic_thickness_matrices[y, x, 0, 0] + periodic_thickness_matrices[y + 1, x, 0, 1]) / 2
+                        periodic_thickness_matrices[y, x, 0, 0] = avg
+                        periodic_thickness_matrices[y + 1, x, 0, 1] = avg
         thickness_matrices = periodic_thickness_matrices[1:-1, 1:-1]
 
     else:
@@ -104,13 +108,15 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
         for y in range(thickness_matrices.shape[0]):
             for x in range(thickness_matrices.shape[1]):
                 if x < full_mesh.shape[1] - 1:
-                    avg = (thickness_matrices[y, x, 1, 1] + thickness_matrices[y, x + 1, 1, 0]) / 2
-                    thickness_matrices[y, x, 1, 1] = avg
-                    thickness_matrices[y, x + 1, 1, 0] = avg
+                    if periodic_thickness_matrices[y, x, 1, 1] != 0 and periodic_thickness_matrices[y, x + 1, 1, 0] != 0:
+                        avg = (thickness_matrices[y, x, 1, 1] + thickness_matrices[y, x + 1, 1, 0]) / 2
+                        thickness_matrices[y, x, 1, 1] = avg
+                        thickness_matrices[y, x + 1, 1, 0] = avg
                 if y < full_mesh.shape[0] - 1:
-                    avg = (thickness_matrices[y, x, 0, 0] + thickness_matrices[y + 1, x, 0, 1]) / 2
-                    thickness_matrices[y, x, 0, 0] = avg
-                    thickness_matrices[y + 1, x, 0, 1] = avg
+                    if periodic_thickness_matrices[y, x, 0, 0] != 0 and periodic_thickness_matrices[y + 1, x, 0, 1] != 0:
+                        avg = (thickness_matrices[y, x, 0, 0] + thickness_matrices[y + 1, x, 0, 1]) / 2
+                        thickness_matrices[y, x, 0, 0] = avg
+                        thickness_matrices[y + 1, x, 0, 1] = avg
 
     block_size = 55
     final_height = rows * block_size
@@ -125,6 +131,8 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
         for x in range(full_mesh.shape[1]):
             block = full_mesh[y][x]
             parent = block[:block.index(" ")]
+            if parent == "void":
+                continue
             suffix_str = block[block.index(" ") + 1:]
             rotation = int(suffix_str)
             elem_id = all_elems[k]
@@ -144,6 +152,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
 
             color_label_matrix[y, x] = label_id
             k += 1
+
     final_raster = linear_filter(final_raster, 4)
     final_raster = heaviside(final_raster, 512)
     # final_raster = final_raster.astype(bool)
