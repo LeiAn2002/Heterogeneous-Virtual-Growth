@@ -28,7 +28,7 @@ from dolfinx import io
 from scripts.project_script import load_field_from_h5
 
 mesh_number = 50
-element_number = 1
+element_number = 2
 mesh_size = (mesh_number, mesh_number)
 element_size = (element_number, element_number)
 candidates = ["cross", "T", "O"]

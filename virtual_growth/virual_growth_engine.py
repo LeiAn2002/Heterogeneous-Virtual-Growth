@@ -122,9 +122,11 @@ class VirtualGrowthEngine:
 
         # Compute some parameters
         self._prepare_dimensions(mesh_size, elem_size, void)
-        if void is not None:
-            self.num_cells = self.num_cells - len(void)
-            # self.num_elems = self.num_elems - len(void)
+        void_elem_mask = np.isin(self.all_elems, void)
+        self.void_cells_idx = np.where(void_elem_mask)[0]
+        self.num_cells = self.num_cells - len(self.void_cells_idx)
+        self.void_elem_ids = np.unique(self.all_elems[self.void_cells_idx])
+        # self.num_elems = self.num_elems - len(void)
 
         names = self.names
         rules = self.rules
@@ -162,9 +164,9 @@ class VirtualGrowthEngine:
                 block_count = np.zeros((self.num_elems, len(aug_candidates)))
                 fill_sequence = np.zeros(self.num_cells)
 
-                if void is not None:
+                if self.void_cells_idx.size:
                     full_mesh_flat = full_mesh.flatten()
-                    full_mesh_flat[void] = -2
+                    full_mesh_flat[self.void_cells_idx] = -2
                     full_mesh[:] = full_mesh_flat.reshape(full_mesh.shape)
 
                 self._growth_attempt(
@@ -268,6 +270,7 @@ class VirtualGrowthEngine:
             ) / (
                 self.num_cells_elem - np.sum(block_count, axis=1).reshape(-1, 1) + 1e-6
             )
+            probs[self.void_elem_ids] = 0.0
             probs[probs <= 0] = 1e-6
             probs /= np.sum(probs, axis=1).reshape(-1, 1)
             probs = np.hstack((probs, np.zeros((self.num_elems, 1))))
@@ -412,8 +415,7 @@ class VirtualGrowthEngine:
         """
         Computes final frequency distribution, decodes the mesh, and does optional plotting and GIF creation.
         """
-        # final_frequency = compute_final_frequency(block_count, self.num_elems-len(void), aug_candidates, candidates)
-
+        # final_frequency = compute_final_frequency(block_count, self.num_elems, aug_candidates, candidates)
 
         # if (make_figure or make_gif) and save_path != "" and not os.path.exists(save_path):
         #     os.makedirs(save_path)

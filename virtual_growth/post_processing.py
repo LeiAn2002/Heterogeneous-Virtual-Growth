@@ -75,6 +75,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             block = full_mesh[y][x]
             parent = block[:block.index(" ")]
             if parent == "void":
+                k += 1
                 continue
             suffix_str = block[block.index(" ") + 1:]
             rotation = int(suffix_str)
@@ -123,8 +124,8 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
     final_width = cols * block_size
     final_raster = np.zeros((final_height, final_width), dtype=np.uint8)
     color_label_matrix = np.ones((rows, cols))
-    block_name_to_label = {}
-    next_label = 1
+    block_name_to_label = {"cross": 3, "T": 1, "O": 2}
+    # next_label = 1
 
     k = 0
     for y in range(full_mesh.shape[0]):
@@ -132,6 +133,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             block = full_mesh[y][x]
             parent = block[:block.index(" ")]
             if parent == "void":
+                k += 1
                 continue
             suffix_str = block[block.index(" ") + 1:]
             rotation = int(suffix_str)
@@ -139,9 +141,9 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             v_range = v_array[elem_id]
             random_radius = r_array[elem_id]
 
-            if parent not in block_name_to_label:
-                block_name_to_label[parent] = next_label
-                next_label += 1
+            # if parent not in block_name_to_label:
+            #     block_name_to_label[parent] = next_label
+            #     next_label += 1
             label_id = block_name_to_label[parent]
 
             block_class = block_library.create_block(parent, m, v_range, rotation, random_radius)
@@ -168,7 +170,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
             label_id = color_label_matrix[y, x]
             colored_final_raster[top:top+block_size, left:left+block_size] *= label_id
 
-    num_labels = next_label  # 1..(next_label-1) are real block labels
+    num_labels = 4  # 1..(next_label-1) are real block labels
     color_list = []
     color_list.append([1, 1, 1])  # background => white
     palette = plt.cm.get_cmap("Set2", num_labels)
