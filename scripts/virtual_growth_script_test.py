@@ -27,15 +27,15 @@ import time
 from dolfinx import io
 from scripts.project_script import load_field_from_h5
 
-mesh_number = 50
+mesh_number = 5
 element_number = 3
 mesh_size = (mesh_number, mesh_number)
 # # mesh_size = (1, 1)
 element_size = (element_number, element_number)
-candidates = ["cross", "T", "O"]
+candidates = ["cross", "TT", "H"]
 num_elems = np.prod(mesh_size)
-# frequency_hints = np.random.rand(num_elems, len(candidates))
-# frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
+frequency_hints = np.random.rand(num_elems, len(candidates))
+frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
 
 # first_row_v = np.linspace(0.3, 0.7, mesh_number)
 # v_array = np.tile(first_row_v, (mesh_number, 1))
@@ -56,13 +56,13 @@ num_elems = np.prod(mesh_size)
 # r_array = np.tile(first_row_r, (mesh_number, 1))
 # r_array = r_array.flatten()
 
-# lower_boundary_v = 0.5
-# upper_boundary_v = 0.5
-# v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number, 2))
+lower_boundary_v = 0.3
+upper_boundary_v = 0.7
+v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number, 2))
 
-# lower_boundary_r = 0.1
-# upper_boundary_r = 0.1
-# r_array = np.random.uniform(low=lower_boundary_r, high=upper_boundary_r, size=(mesh_number * mesh_number, ))
+lower_boundary_r = 0.1
+upper_boundary_r = 0.1
+r_array = np.random.uniform(low=lower_boundary_r, high=upper_boundary_r, size=(mesh_number * mesh_number, ))
 
 # d, m, n = 0.5, 0.75, 0.25
 
@@ -70,45 +70,9 @@ m = 0.75
 save_path = "designs/2d/"
 fig_name = "symbolic_graph.jpg"
 gif_name = "symbolic_graph.gif"
-block_names = ["cross", "T", "O"]
+# block_names = ["cross", "T", "C"]
 
-input_files = ["./datas/data_cloak/data_after_project/rho_field_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/ksi_field_1_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/ksi_field_2_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/ksi_field_3_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/vf_field_DG0.xdmf"]  # list your files here
-
-value_list = []
-for xfile in input_files:
-    stem = Path(xfile).stem
-    h5file = Path(xfile).with_suffix(".h5")
-    if not h5file.exists():
-        raise FileNotFoundError(f"{h5file} missing.")
-
-    # (1) read mesh
-    with io.XDMFFile(MPI.COMM_WORLD, xfile, "r") as xdmf:
-        mesh = xdmf.read_mesh()
-
-    # (2) read field via h5py
-    f_src, already_dg0, num_cells = load_field_from_h5(mesh, h5file)
-    value_list.append(f_src)
-
-rho_field = value_list[0].x.array
-void = np.where(rho_field < 0.1)[0]
-# void = None
-frequency_hints_list = []
-for i in range(len(candidates)):
-    frequency_hints_list.append(value_list[i + 1].x.array)
-frequency_hints_array = np.array(frequency_hints_list)
-frequency_hints = frequency_hints_array.transpose()
-frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
-
-v = value_list[-1].x.array
-# print(v.shape)
-r_array = np.random.uniform(low=0.1, high=0.1, size=(num_elems,))
-v_array = np.vstack((v-0.05, v+0.05)).T
-# print(v_array.shape)
-
+void = None
 
 if __name__ == "__main__":
     start_time = time.time()
