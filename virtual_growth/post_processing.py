@@ -124,7 +124,7 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
     final_width = cols * block_size
     final_raster = np.zeros((final_height, final_width), dtype=np.uint8)
     color_label_matrix = np.ones((rows, cols))
-    block_name_to_label = {"cross": 3, "T": 1, "O": 2}
+    block_name_to_label = {"cross": 3, "TT": 1, "H": 2}
     # next_label = 1
 
     k = 0

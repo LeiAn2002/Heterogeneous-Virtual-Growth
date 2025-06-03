@@ -57,11 +57,11 @@ def l2_project(src, V_dst):
     return dst
 
 # -------------- main loop ------------------------------------------ #
-input_files = ["./datas/data_beam/rho_field.xdmf",
-               "./datas/data_beam/ksi_field_1.xdmf",
-               "./datas/data_beam/ksi_field_2.xdmf",
-               "./datas/data_beam/ksi_field_3.xdmf",
-               "./datas/data_beam/vf_field.xdmf"]  # list your files here
+input_files = ["./datas/data_cloak/rho_field.xdmf",
+               "./datas/data_cloak/ksi_field_1.xdmf",
+               "./datas/data_cloak/ksi_field_2.xdmf",
+               "./datas/data_cloak/ksi_field_3.xdmf",
+               "./datas/data_cloak/vf_field.xdmf"]  # list your files here
 suffix_out    = "_DG0.xdmf"
 
 if __name__ == "__main__":
