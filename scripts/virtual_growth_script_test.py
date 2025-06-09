@@ -28,11 +28,12 @@ from dolfinx import io
 from scripts.project_script import load_field_from_h5
 
 mesh_number = 5
-element_number = 3
+element_number = 4
 mesh_size = (mesh_number, mesh_number)
 # # mesh_size = (1, 1)
 element_size = (element_number, element_number)
-candidates = ["cross", "TT", "H"]
+candidates = ["star", "gripper", "T", "V", "O"]
+# candidates = ["star"]
 num_elems = np.prod(mesh_size)
 frequency_hints = np.random.rand(num_elems, len(candidates))
 frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
@@ -60,8 +61,8 @@ lower_boundary_v = 0.3
 upper_boundary_v = 0.7
 v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number, 2))
 
-lower_boundary_r = 0.1
-upper_boundary_r = 0.1
+lower_boundary_r = 0.05
+upper_boundary_r = 0.05
 r_array = np.random.uniform(low=lower_boundary_r, high=upper_boundary_r, size=(mesh_number * mesh_number, ))
 
 # d, m, n = 0.5, 0.75, 0.25
