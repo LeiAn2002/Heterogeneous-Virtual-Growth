@@ -5,10 +5,10 @@ from virtual_growth.main import main
 from blocks.block_mesh_2d import generate_mesh, load_msh_with_meshio
 from homogenization.homogenization_2d import homogenized_elasticity_matrix_2d
 
-output_file = "incremental_training_data.npz"
+output_file = "formal_test_data.npz"
 
 num_of_groups = 1000
-runs_per_group = 20
+runs_per_group = 1
 
 save_path   = "designs/2d/"
 design_path = os.path.join(save_path, "symbolic_graph.npy")
@@ -21,12 +21,12 @@ element_number = 10
 mesh_size = (mesh_number, mesh_number)
 element_size = (element_number, element_number)
 m = 0.75
-candidates = ["cross", "T", "O"]
+candidates = ["star", "gripper", "T", "V", "O"]
 num_elems = np.prod(mesh_size)
 
-np.random.seed(1919810)
+np.random.seed(114514)
 data = np.zeros((num_of_groups, num_elems, len(candidates)))
-v_data   = np.random.uniform(0.3, 0.7, size=(num_of_groups,))
+v_data = np.random.uniform(0.3, 0.7, size=(num_of_groups,))
 
 for i in range(num_of_groups):
     random_values = np.random.uniform(0, 1, (num_elems, len(candidates)))
@@ -35,7 +35,7 @@ for i in range(num_of_groups):
 
 if os.path.exists(output_file):
     existing_data = np.load(output_file)
-    all_inputs = existing_data["inputs"].tolist().
+    all_inputs = existing_data["inputs"].tolist()
     all_labels = existing_data["labels"].tolist()
 else:
     all_inputs = []
@@ -48,7 +48,7 @@ for i in range(num_of_groups):
     for j in range(runs_per_group):
         try:
             v_array = np.random.uniform(low=v-v_bias, high=v+v_bias, size=(num_elems, 2))
-            r_array = np.random.uniform(low=0.1, high=0.1, size=(num_elems,))
+            r_array = np.random.uniform(low=0.05, high=0.05, size=(num_elems,))
             main(
                     mesh_size, element_size, 
                     candidates,
@@ -104,6 +104,6 @@ for i in range(num_of_groups):
     all_labels.append(selected_elements_avg.tolist())
 
     np.savez(output_file, inputs=np.array(all_inputs), labels=np.array(all_labels))
-    print(f"Data saved for group {i + 1}/100")
+    print(f"Data saved for group {i + 1}/1000")
 
 print("All data processing completed and saved.")
