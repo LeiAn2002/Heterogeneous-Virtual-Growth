@@ -5,10 +5,10 @@ from virtual_growth.main import main
 from blocks.block_mesh_2d import generate_mesh, load_msh_with_meshio
 from homogenization.homogenization_2d import homogenized_elasticity_matrix_2d
 
-output_file = "formal_test_data.npz"
+output_file = "final_data.npz"
 
 num_of_groups = 1000
-runs_per_group = 1
+runs_per_group = 20
 
 save_path   = "designs/2d/"
 design_path = os.path.join(save_path, "symbolic_graph.npy")
@@ -21,10 +21,10 @@ element_number = 10
 mesh_size = (mesh_number, mesh_number)
 element_size = (element_number, element_number)
 m = 0.75
-candidates = ["star", "gripper", "T", "V", "O"]
+candidates = ["star", "gripper", "arrow", "V", "O"]
 num_elems = np.prod(mesh_size)
 
-np.random.seed(12345)
+np.random.seed(114514)
 data = np.zeros((num_of_groups, num_elems, len(candidates)))
 v_data = np.random.uniform(0.35, 0.7, size=(num_of_groups,))
 
@@ -73,8 +73,8 @@ for i in range(num_of_groups):
 
             nodes, tri_elems, quad_elems = load_msh_with_meshio(msh_file)
             mat_table = {
-                "E": 2.41,
-                "nu": 0.35,
+                "E": 2800,
+                "nu": 0.34,
                 "PSflag": "PlaneStress",
                 "RegMesh": False,
                 "thickness": 1.0,
