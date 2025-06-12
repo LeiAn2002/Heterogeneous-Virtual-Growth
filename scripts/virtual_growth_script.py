@@ -32,7 +32,8 @@ element_number = 3
 mesh_size = (mesh_number, mesh_number)
 # # mesh_size = (1, 1)
 element_size = (element_number, element_number)
-candidates = ["cross", "T", "O"]
+# candidates = ["cross", "T", "O"]
+candidates = ["star", "gripper", "T", "V", "O"]
 num_elems = np.prod(mesh_size)
 # frequency_hints = np.random.rand(num_elems, len(candidates))
 # frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 1)
@@ -70,13 +71,15 @@ m = 0.75
 save_path = "designs/2d/"
 fig_name = "symbolic_graph.jpg"
 gif_name = "symbolic_graph.gif"
-block_names = ["cross", "T", "O"]
+# block_names = ["cross", "T", "O"]
 
-input_files = ["./datas/data_cloak/data_after_project/rho_field_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/ksi_field_1_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/ksi_field_2_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/ksi_field_3_DG0.xdmf",
-               "./datas/data_cloak/data_after_project/vf_field_DG0.xdmf"]  # list your files here
+input_files = ["./datas/data_cloak_new/data_after_project/rho_field_DG0.xdmf",
+               "./datas/data_cloak_new/data_after_project/ksi_field_1_DG0.xdmf",
+               "./datas/data_cloak_new/data_after_project/ksi_field_2_DG0.xdmf",
+               "./datas/data_cloak_new/data_after_project/ksi_field_3_DG0.xdmf",
+               "./datas/data_cloak_new/data_after_project/ksi_field_4_DG0.xdmf",
+               "./datas/data_cloak_new/data_after_project/ksi_field_5_DG0.xdmf",
+               "./datas/data_cloak_new/data_after_project/vf_field_DG0.xdmf"]  # list your files here
 
 value_list = []
 for xfile in input_files:

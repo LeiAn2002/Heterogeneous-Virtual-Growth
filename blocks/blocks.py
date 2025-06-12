@@ -791,7 +791,7 @@ class StarBlock2D(Block):
         middle = np.random.uniform(lower_bound, upper_bound, size=(self.number_of_curves, self.number_of_inner_points))
         ones_left = 0.5 * np.ones((self.number_of_curves, 2))
         ones_right = 0.5 * np.ones((self.number_of_curves, 2))
-        vf = np.hstack([ones_left, middle**3, ones_right])
+        vf = np.hstack([ones_left, middle**2, ones_right])
         block = block_generation(
                 basic_points=self.basic_points,
                 outer_count=self.outer_count,
@@ -1141,6 +1141,120 @@ class GripperBlock2D(Block):
         rand12 = np.random.uniform(lower_bound, upper_bound, size=2)
         new_row = np.array([1.0, 1.0, rand12[0], rand12[1], 0.0])
         vf = np.vstack([new_row, new_row, vf])
+        block = block_generation(
+                basic_points=self.basic_points,
+                outer_count=self.outer_count,
+                r=self.random_radius,
+                curve_definitions=self.curve_definitions,
+                vf=vf,
+                forbidden_edges_set=forbidden_edges,
+                r_filter=2,
+            )
+
+        block = np.rot90(block, self.rotation)
+        block = block
+        return block
+
+    def generate_elements(self, **kwargs):
+        pass
+
+    def generate_mesh(self, thickness_matrix, num_elems_d, **kwargs):
+        pass
+
+
+@register_block_class
+class ArrowBlock2D(Block):
+
+    type_name = "arrow"
+
+    def __init__(self, m=0.75, v_range=[0.4, 0.6], rotation=0, random_radius=0.6, **kwargs):
+        self.m = m
+        self.v_range = v_range
+        self.rotation = rotation
+        self.random_radius = random_radius
+        self.vertical_points = np.array([
+            (0, -1),   # bottom boundary
+            (0, -0.9),  # garantee perpendicular to the boundary
+
+            (0, 0.9),   # top boundary
+            (0, 1)])
+        self.horizontal_points = np.array([
+            (-1, 0),   # left boundary
+            (-0.9, 0),
+
+            (0.9, 0),   # right boundary
+            (1, 0)])
+        self.outer_basic_points = np.concatenate((self.vertical_points, self.horizontal_points))
+        self.top_left_inner_points = np.array([
+            (-1/2, 1/2)
+        ])
+        self.top_right_inner_points = np.array([
+            (1/2, 1/2)
+        ])
+        self.center_inner_points = np.array([
+            (0, 0)
+        ])
+        self.inner_basic_points = np.concatenate((self.top_left_inner_points, self.top_right_inner_points, self.center_inner_points))
+        self.basic_points = np.concatenate((self.outer_basic_points, self.inner_basic_points))
+        self.outer_count = len(self.outer_basic_points)
+
+        self.curve_definitions = [
+            [0, 1, 10, 2, 3],
+            [3, 2, 8, 5, 4],
+            [3, 2, 9, 6, 7]
+        ]
+        self.number_of_curves = len(self.curve_definitions)
+        self.number_of_inner_points = len(self.top_left_inner_points)
+
+    def get_adjacent_matrix(self, **kwargs):
+        adj_matrix = np.array([
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 1, 1, 1, 0, 0],
+            [0, 1, 0, 1, 0, 1, 0],
+            [1, 0, 0, 1, 0, 0, 1],
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0]
+        ]).astype(int)
+        return adj_matrix
+
+    def get_thickness(self, **kwargs):
+        lower_boundary = self.v_range[0]
+        upper_boundary = self.v_range[1]
+
+        # thickness of 4 edges, order: bottom, top, left, right
+        thickness_matrix = np.random.uniform(lower_boundary, upper_boundary, size=(2, 2))
+        rotated_thickness_matrix = rotate_thickness_matrix(thickness_matrix, self.rotation)
+        return rotated_thickness_matrix
+
+    def generate_block_shape(self, thickness_matrix, **kwargs):
+        t = rotate_thickness_matrix(thickness_matrix, -self.rotation)  # original thickness_matrix
+        forbidden_edges = np.array([
+                           [(-1, -1, -1, 1),
+                            (1, -1, 1, 1),
+                            (-1, -1, -t[0][0]*2, -1),
+                            (t[0][0]*2, -1, 1, -1),
+                            (-1, 1, -t[0][1]*2, 1),
+                            (t[0][1]*2, 1, 1, 1)],
+                           [(-1, -1, 1, -1),
+                            (1, -1, 1, 1),
+                            (-1, 1, -t[0][1]*2, 1),
+                            (t[0][1]*2, 1, 1, 1),
+                            (-1, -1, -1, -t[1][0]*2),
+                            (-1, t[1][0]*2, -1, 1)],
+                           [(-1, -1, -1, 1),
+                            (-1, -1, 1, -1),
+                            (-1, 1, -t[0][1]*2, 1),
+                            (t[0][1]*2, 1, 1, 1),
+                            (1, -1, 1, -t[1][1]*2),
+                            (1, t[1][1]*2, 1, 1)]
+                            ])
+        lower_bound = self.v_range[0]
+        upper_bound = self.v_range[1]
+        middle = np.random.uniform(lower_bound, upper_bound, size=(self.number_of_curves, self.number_of_inner_points))
+        ones_left = 0.5*np.ones((self.number_of_curves, 2))
+        ones_right = 0.5*np.ones((self.number_of_curves, 2))
+        vf = np.hstack([ones_left, middle**1, ones_right])
         block = block_generation(
                 basic_points=self.basic_points,
                 outer_count=self.outer_count,

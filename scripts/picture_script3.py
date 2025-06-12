@@ -5,8 +5,8 @@ from matplotlib.lines import Line2D
 import os
 
 # ============================= 用户可配置 =============================
-NPZ_PATH      = "test_data.npz"          # 数据库路径
-CATEGORY_NAMES = ["H", "T", "V", "TT"]                  # 频率列顺序 (k 列)
+NPZ_PATH      = "formal_test_data.npz"          # 数据库路径
+CATEGORY_NAMES = ["star", "gripper", "T", "V", "O"]                  # 频率列顺序 (k 列)
 PALETTE_NAME  = "tab10"                                 # 色板
 V_INTERVALS   = [(0.3, 0.4), (0.4, 0.5), (0.5, 0.6), (0.6, 0.7)]
 OUT_DIR       = "figs_by_v"                             # 输出文件夹
@@ -50,14 +50,16 @@ nu_vals = np.asarray(nu_vals)
 
 # ========= Step 3. 计算颜色、尺寸、v  (只展示改动部分) =========
 # 3-1 预设 4 个基准色（可自行替换）
+set2        = cm.get_cmap("Set2", 8)        # 返回 8 色
 BASE_COLORS = np.array([
-    (31, 119, 180),   # H  → 蓝
-    (255, 127, 14),   # T  → 橙
-    (44, 160, 44),    # V  → 绿
-    (214, 39, 40)     # TT → 红
-]) / 255.0           # 归一化到 0-1
+    set2(0)[:3],   # star  → #66C2A5
+    set2(1)[:3],   # gripper → #FC8D62
+    set2(2)[:3],   # T     → #8DA0CB
+    set2(4)[:3],   # V     → #A6D854
+    set2(5)[:3],   # O     → #FFD92F
+])
 
-COLOR_DICT = dict(zip(CATEGORY_NAMES, BASE_COLORS))  # 供图例使用
+COLOR_DICT = dict(zip(CATEGORY_NAMES, BASE_COLORS))   # 供图例使用
 
 rgb_colors, sizes, v_vals = [], [], []
 
@@ -105,7 +107,9 @@ def plot_scatter(mask, title, fname):
     ax.set_ylabel(r"$\nu^{ave}$",        fontsize=12)
     ax.set_title(title, fontsize=14, pad=10)
     ax.set_xlim(0, 1.05*E_norm.max())
-    ax.set_ylim(1.05*nu_vals.min(), 1.05*nu_vals.max())
+    ax.set_ylim(-0.5*1.05, 1.05*0.75)
+    ax.tick_params(axis='x', labelsize=20)   # x 轴数字字体 14
+    ax.tick_params(axis='y', labelsize=20)   # y 轴数字字体 14
     ax.set_facecolor('white')
     plt.tight_layout()
     plt.savefig(fname, dpi=300, bbox_inches="tight")
