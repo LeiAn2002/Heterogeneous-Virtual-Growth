@@ -24,9 +24,9 @@ m = 0.75
 candidates = ["star", "gripper", "T", "V", "O"]
 num_elems = np.prod(mesh_size)
 
-np.random.seed(114514)
+np.random.seed(12345)
 data = np.zeros((num_of_groups, num_elems, len(candidates)))
-v_data = np.random.uniform(0.3, 0.7, size=(num_of_groups,))
+v_data = np.random.uniform(0.35, 0.7, size=(num_of_groups,))
 
 for i in range(num_of_groups):
     random_values = np.random.uniform(0, 1, (num_elems, len(candidates)))
