@@ -359,7 +359,7 @@ def plot_microstructure_3d(
     #     os.makedirs(save_path, exist_ok=True)
     #     np.savetxt(os.path.join(save_path, "voxels.txt"), vol.reshape(-1), fmt="%d")
     # print(np.unique(vol))
-    np.savetxt("vol.txt", vol.flatten(), fmt='%.6f')
+    # np.savetxt("vol.txt", vol.flatten(), fmt='%.6f')
 
     plot_voxel_structure_binary(
         vol,               # 0/1 ndarray
