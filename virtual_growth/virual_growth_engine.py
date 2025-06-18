@@ -72,7 +72,8 @@ class VirtualGrowthEngine:
             self.all_extended_block_names,
             self.encoded_rotation_table,
             self.encoded_rules,
-            self.encoded_special_rules
+            self.encoded_special_rules,
+            self.uid2oid
         ) = pair_rule_gen.generate_rules(block_names)
 
         # Optionally decode or reorganize these if needed.
@@ -81,6 +82,7 @@ class VirtualGrowthEngine:
         self.rules = self.encoded_rules
         self.rotation_table = self.encoded_rotation_table
         self.special_rules = self.encoded_special_rules
+        self.uid2oid = self.uid2oid
 
     def run_growth(
         self,
@@ -460,7 +462,7 @@ class VirtualGrowthEngine:
                     m, full_mesh, self.all_elems, self.block_library, v_array, r_array, periodic, color=color, save_path=save_path, fig_name=fig_name)
             else:  # 3D
                 final_voxel = plot_microstructure_3d(
-                    m, full_mesh, self.all_elems, self.block_library, v_array, r_array, periodic, save_path=save_path, fig_name=fig_name)
+                    m, full_mesh, self.uid2oid, self.all_elems, self.block_library, v_array, r_array, periodic, save_path=save_path, fig_name=fig_name)
         if save_mesh:
             if self.dim == 2:
                 np.save(save_mesh_path + save_mesh_name, final_raster)

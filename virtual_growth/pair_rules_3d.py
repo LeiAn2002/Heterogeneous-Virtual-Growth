@@ -1,6 +1,8 @@
 # pair_rules_3d.py
 import numpy as np
 from utils.array_list_operations import find_indices, find_max_length_nested_list
+from collections import defaultdict
+from typing import Dict
 
 
 class PairRules3D:
@@ -22,13 +24,15 @@ class PairRules3D:
              extended_names,
              encoded_rotation_table,
              encoded_adj_rules,
-             encoded_special_rules)
+             encoded_special_rules,
+             uid2oid)
 
         No file I/O is performed here.
         """
         all_unique_blocks = []
         all_block_names = []
         all_extended_block_names = []
+        uid2oid: Dict[str, Dict[int, int]] = defaultdict(dict)
 
         # 1. generate all distinct rotations for each block
         for name in block_names:
@@ -41,6 +45,7 @@ class PairRules3D:
                 all_unique_blocks.append(rotations[idx])
                 all_block_names.append(name)
                 all_extended_block_names.append(f"{name} {count}")
+                uid2oid[name][count] = int(idx)
 
         # 2. pairwise admissible rule list
         rules = []
@@ -66,6 +71,7 @@ class PairRules3D:
             enc_rot,
             enc_rules,
             enc_spec,
+            uid2oid
         )
 
     # ---------- helpers -----------------------------------------------------

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from blocks.random_block import block_generation
 from blocks.random_blocks_3d import voxel_building_block
-from utils.rotation_matrix import rotate_thickness_matrix, rotate_thickness_matrix_3d, rotate_voxel_24
+from utils.rotation_matrix import rotate_thickness_matrix, rotate_thickness_matrix_3d, rotate_voxel_24, inv_id
 
 ALL_BLOCKS = {}
 
@@ -1294,8 +1294,6 @@ class CrossBlock3D(Block):
             [5, 1, 6]
         ]   # Z-axis curve
 
-        self.number_of_curves = len(self.curve_definitions)
-
     def get_adjacent_matrix(self, **kwargs):
         adj_matrix = np.array([
             [
@@ -1334,6 +1332,93 @@ class CrossBlock3D(Block):
             [t[4], middle, t[5]],
             [t[2], middle, t[3]],
             [t[0], middle, t[1]]
+        ]
+        
+        block = voxel_building_block(
+                points=self.basic_points, pin_flags=self.pins,
+                curve_defs=self.curve_definitions, vf_groups=vf,
+                random_radius=self.random_radius, pitch=0.04,
+                r_filter_vox=0)
+
+        block = rotate_voxel_24(block, self.rotation)
+        return block
+
+    def generate_elements(self, **kwargs):
+        pass
+
+    def generate_mesh(self, thickness_matrix, num_elems_d, **kwargs):
+        pass
+
+
+@register_block_class
+class TBlock3D(Block):
+
+    type_name = "t_3d"
+
+    def __init__(self, m=0.75, v_range=[0.4, 0.6], rotation=0, random_radius=0.6, **kwargs):
+        self.m = m
+        self.v_range = v_range
+        self.rotation = rotation
+        self.random_radius = random_radius
+        self.basic_points = [
+            (-1, 0, 0),  # 0
+            (0, 0, 0),   # 1 shared origin
+            (1, 0, 0),   # 2
+            (0, 0.5, 0),  # 3
+            (0, 1, 0),   # 4
+        ]
+
+        self.pins = [True, False, True, False, True]
+
+        self.curve_definitions = [
+            [0, 1, 2],   # X-axis curve
+            [4, 3, 1],   # Y-axis curve
+        ]
+
+    def get_adjacent_matrix(self, **kwargs):
+        adj_matrix = np.array([
+            [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+            ],
+            [
+                [0, 0, 0],
+                [1, 1, 1],
+                [0, 1, 0],
+            ],
+            [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+            ],
+        ]).astype(int)
+        return adj_matrix
+
+    def get_thickness(self, **kwargs):
+        lower_boundary = self.v_range[0]
+        upper_boundary = self.v_range[1]
+
+        # thickness of 6 surfaces
+        first_part = np.zeros(3)
+        second_part = np.random.uniform(lower_boundary, upper_boundary, 3)
+        thickness_matrix = np.concatenate((first_part, second_part))  # Z- Z+ Y- Y+ X- X+
+        # print(thickness_matrix)
+        rotated_thickness_matrix = rotate_thickness_matrix_3d(thickness_matrix, self.rotation)
+        # print(self.rotation)
+        return rotated_thickness_matrix
+
+    def generate_block_shape(self, thickness_matrix, **kwargs):
+        # print(self.rotation)
+        t = rotate_thickness_matrix_3d(thickness_matrix, inv_id(self.rotation))  # original thickness_matrix
+        # print(t)
+        lower_bound = self.v_range[0]
+        upper_bound = self.v_range[1]
+        middle = np.random.uniform(lower_bound, upper_bound)
+        rand = np.random.uniform(lower_bound, upper_bound)
+        vf = [
+            [t[4], middle, t[5]],
+            [t[3], rand, middle],
         ]
         
         block = voxel_building_block(
