@@ -26,11 +26,11 @@ from pathlib import Path
 import time
 
 mesh_number = 1
-element_number = 2
+element_number = 1
 mesh_size = (mesh_number, mesh_number, mesh_number)
 # mesh_size = (1, 1)
 element_size = (element_number, element_number, element_number)
-candidates = ["t_3d", "cross_3d"]
+candidates = ["t_3d"]
 # candidates = ["arrow"]
 num_elems = np.prod(mesh_size)
 frequency_hints = np.random.rand(num_elems, len(candidates))
