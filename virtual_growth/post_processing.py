@@ -21,13 +21,72 @@ Citations:
 
 from collections import Counter
 import numpy as np
-import pyvista
+import pyvista as pv
 import matplotlib.pyplot as plt
 from utils.linear_and_heaviside_filter import linear_filter, heaviside
 from matplotlib.colors import ListedColormap
 from skimage.morphology import remove_small_holes
+import os
+from typing import Tuple
 
 from utils.remove_repeated_nodes import remove_repeated_nodes
+
+
+def plot_voxel_structure_binary(
+        vol: np.ndarray,                # 0/1 体素数组，shape=(Z,Y,X)
+        pitch: float,
+        bb_min: Tuple[float, float, float] = (0., 0., 0.),
+        color: str = "skyblue",
+        opacity_value: float = 1.0,
+        save_path: str = "",            # 保存目录；"" → 交互显示
+        fig_name: str = "voxel_binary.png",
+        show_grid: bool = False,
+        window_size=(1600, 1600)
+):
+    """Render a binary voxel structure (labels 0/1) with PyVista."""
+    Nz, Ny, Nx = vol.shape
+
+    # 1) VTK ImageData
+    grid = pv.ImageData(
+        dimensions=(Nx + 1, Ny + 1, Nz + 1),
+        spacing=(pitch, pitch, pitch),
+        origin=bb_min,
+    )
+    # grid.cell_data["rho"] = vol.ravel(order="F")      # 只含 0/1
+    grid.cell_data["rho"] = vol.transpose(2, 1, 0).ravel(order="F").astype(np.float32)
+
+
+    # 2) Plotter
+    off = bool(save_path)
+    if off:
+        pv.global_theme.off_screen = True
+    p = pv.Plotter(off_screen=off, window_size=window_size)
+
+    # 3) 体素渲染：同你单块函数的参数
+    p.add_volume(
+        grid,
+        scalars="rho",
+        opacity=[0.0, opacity_value],   # 0 → 透明，1 → 不透明
+        cmap=[color, color],            # 两个颜色值即可
+        shade=False,
+        preference="cell",
+    )
+
+    if show_grid:
+        p.show_grid(color="lightgray")
+    # p.view_isometric()
+    # p.reset_camera()                   # 保证相机在外
+
+    # 4) 显示 / 保存
+    if off:
+        os.makedirs(save_path, exist_ok=True)
+        p.show(auto_close=False)       # 触发离屏渲染
+        p.screenshot(os.path.join(save_path, fig_name))
+        print("[INFO] saved:", os.path.join(save_path, fig_name))
+    else:
+        p.show(title="Voxel structure")
+
+    p.close()
 
 
 def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
@@ -191,60 +250,116 @@ def plot_microstructure_2d(m, full_mesh, all_elems, block_library,
     return final_raster
 
 
-def plot_microstructure_3d(full_mesh, block_lib, block_nodes, names,
-                           block_size, solid=[], void=[], color="#96ADFC",
-                           save_path="", fig_name="microstructure.jpg"):
-    node_count = 0
-    k = 0
-    element_count = np.zeros(full_mesh.size, dtype=int)
-    element_list, node_list = [], []
+ZMIN, ZMAX, YMIN, YMAX, XMIN, XMAX = range(6)
 
-    for z in range(full_mesh.shape[0]):
-        for y in range(full_mesh.shape[1]):
-            for x in range(full_mesh.shape[2]):
+
+def plot_microstructure_3d(
+    m,
+    full_mesh,                  # (Nz, Ny, Nx) of "parent suffix"
+    all_elems,                  # len = Nz*Ny*Nx
+    block_library,
+    v_array,                    # (Ne,2)
+    r_array,                    # (Ne,)
+    periodic=True,
+    save_path="",
+    fig_name="microstructure_3d.png",
+):
+    """
+    Assemble all voxel blocks into one global volume, colour by parent name,
+    and render with PyVista.
+
+    Returns
+    -------
+    volume : np.ndarray(uint8)  shape (Ztot, Ytot, Xtot)  – 0=void, 1..n=labels
+    """
+    Nz, Ny, Nx = full_mesh.shape
+
+    parent_set = sorted({cell.split(" ")[0] for cell in full_mesh.ravel()
+                         if not cell.startswith("void")})
+    parent2lbl = {p: i + 1 for i, p in enumerate(parent_set)}
+    # n_lbl = len(parent_set)
+    # color_list = [[1, 1, 1]] + [plt.get_cmap("Set2", n_lbl)(i)[:3]
+    #                              for i in range(n_lbl)]
+    # cmap = ListedColormap(color_list)
+
+    thickness_arr = np.zeros((Nz, Ny, Nx, 6), dtype=np.float32)
+    block_meta = []
+    k = 0
+    for z in range(Nz):
+        for y in range(Ny):
+            for x in range(Nx):
                 block = full_mesh[z][y][x]
                 parent = block[:block.index(" ")]
-                index = names.tolist().index(block)
-
-                elements = block_lib[parent]["elements"].copy()
-                elements[:, 1:] += node_count
-                nodes = block_nodes[index].copy()
-
-                nodes[:, 0] -= block_size * x  # Note here it should minus
-                nodes[:, 1] += block_size * y
-                nodes[:, 2] += block_size * z
-                node_count += nodes.shape[0]
-
-                element_list.extend(elements.tolist())
-                node_list.extend(nodes.tolist())
-
-                element_count[k] = elements.shape[0]
+                if parent == "void":
+                    k += 1
+                    continue
+                suffix_str = block[block.index(" ") + 1:]
+                rotation = int(suffix_str)
+                eid = all_elems[k]
+                v_rng = v_array[eid]
+                rand_r = r_array[eid]
+                blk = block_library.create_block(parent, m, v_rng,
+                                                 rotation, rand_r)
+                thickness_arr[z, y, x] = blk.get_thickness()
+                block_meta.append((z, y, x, parent, rotation, v_rng, rand_r))
                 k += 1
 
-    elements = np.array(element_list)
-    nodes = np.array(node_list)
-    nodes, elements = remove_repeated_nodes(nodes, elements[:, 1:], precision=6)
-    elements = np.hstack((
-        np.full((elements.shape[0], 1), elements.shape[1]), elements,
-    )).astype(int)
-    cell_types = np.full(elements.shape[0], 12, dtype=int)
+    def _avg(a, b):
+        mask = (a > 0) & (b > 0)
+        avg = 0.5 * (a[mask] + b[mask])
+        a[mask] = b[mask] = avg
 
-    pyvista.OFF_SCREEN = True
-    pyvista.set_plot_theme("document")
-    pyvista.start_xvfb()
-    figsize = 2000
-    plotter = pyvista.Plotter(window_size=[figsize, figsize])
-    grid = pyvista.UnstructuredGrid(elements, cell_types, nodes)
-    plotter.add_mesh(grid, color=color, lighting=True,
-                     show_edges=False, show_scalar_bar=False)
+    _avg(thickness_arr[:, :, :-1, XMAX], thickness_arr[:, :, 1:, XMIN])
+    _avg(thickness_arr[:, :-1, :, YMAX], thickness_arr[:, 1:, :, YMIN])
+    _avg(thickness_arr[:-1, :, :, ZMAX], thickness_arr[1:, :, :, ZMIN])
 
-    plotter.background_color = "white"
-    plotter.show_axes()
+    if periodic:
+        _avg(thickness_arr[:, :, 0, XMIN], thickness_arr[:, :, -1, XMAX])
+        _avg(thickness_arr[:, 0, :, YMIN], thickness_arr[:, -1, :, YMAX])
+        _avg(thickness_arr[0, :, :, ZMIN], thickness_arr[-1, :, :, ZMAX])
 
-    plotter.screenshot(save_path+fig_name, window_size=[figsize, figsize])
-    plotter.close()
+    # np.savetxt(os.path.join(save_path, "thickness_arr.txt"),
+    #            thickness_arr.reshape(-1, 6), fmt="%.4f")
 
-    return elements, cell_types, nodes, element_count
+    sample_z, sample_y, sample_x, *_ = block_meta[0]
+    sample_blk = block_library.create_block(
+        block_meta[0][3], m, block_meta[0][5], block_meta[0][4],
+        block_meta[0][6])
+    bz, by, bx = sample_blk.generate_block_shape(
+        thickness_arr[sample_z, sample_y, sample_x]).shape
+    assert bz == by == bx
+    bsize = bz
+
+    vol = np.zeros((Nz*bsize, Ny*bsize, Nx*bsize), dtype=np.uint8)
+
+    for z, y, x, parent, rot, v_rng, rand_r in block_meta:
+        blk = block_library.create_block(parent, m, v_rng, rot, rand_r)
+        vox = blk.generate_block_shape(
+            thickness_arr[z, y, x])
+        lbl = parent2lbl[parent]
+        vox *= lbl
+        z0, y0, x0 = z*bsize, y*bsize, x*bsize
+        vol[z0:z0+bsize, y0:y0+by, x0:x0+bx] = np.maximum(
+            vol[z0:z0+bsize, y0:y0+by, x0:x0+bx], vox)
+        
+    # save vol as txt
+    # if save_path:
+    #     os.makedirs(save_path, exist_ok=True)
+    #     np.savetxt(os.path.join(save_path, "voxels.txt"), vol.reshape(-1), fmt="%d")
+    # print(np.unique(vol))
+    np.savetxt("vol.txt", vol.flatten(), fmt='%.6f')
+
+    plot_voxel_structure_binary(
+        vol,               # 0/1 ndarray
+        pitch=0.04,
+        bb_min=(-1, -1, -1),
+        color="black",
+        opacity_value=1.0,
+        save_path=save_path,      # "" → 交互
+        fig_name=fig_name,
+    )
+
+    return vol
 
 
 def plot_microstructure_gif(fill_sequence, elements, cell_types, nodes,

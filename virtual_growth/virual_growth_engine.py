@@ -16,6 +16,7 @@ from virtual_growth.post_processing import (
 )
 from utils.array_list_operations import find_indices
 from virtual_growth.pair_rules_2d import PairRules2D
+from virtual_growth.pair_rules_3d import PairRules3D
 
 
 class VirtualGrowthEngine:
@@ -61,7 +62,10 @@ class VirtualGrowthEngine:
         Generate adjacency rules, rotation tables, etc., using PairRules2D.
         Stores the results as class attributes for subsequent use in run_growth.
         """
-        pair_rule_gen = PairRules2D(self.block_library)
+        if self.dim == 2:
+            pair_rule_gen = PairRules2D(self.block_library)
+        else:
+            pair_rule_gen = PairRules3D(self.block_library)
 
         (
             self.all_unique_blocks,
@@ -319,9 +323,11 @@ class VirtualGrowthEngine:
                     bottom_blocks[checked_cells]
                 )
             else:
-                # 3D
-                # ...
-                pass  # find_admissible_blocks_3d logic
+                admissible_blocks = find_admissible_blocks_3d(
+                        rules, rotation_table, aug_candidates_encoded, special_rules,
+                        left_blocks[checked_cells], right_blocks[checked_cells],
+                        front_blocks[checked_cells], back_blocks[checked_cells],
+                        top_blocks[checked_cells], bottom_blocks[checked_cells])
 
             idx_map = find_indices(aug_candidates_encoded_ref, admissible_blocks.flatten())
             idx_map = idx_map.reshape(admissible_blocks.shape)
@@ -364,8 +370,7 @@ class VirtualGrowthEngine:
                 xx = self.x_cell[target_cell]
                 full_mesh[yy, xx] = target_block
             else:
-                # 3D logic
-                pass
+                full_mesh[self.z_cell[target_cell], self.y_cell[target_cell], self.x_cell[target_cell]] = target_block
 
             # Update count
             chosen_block_index = np.argwhere(aug_candidates_encoded_ref == target_block)[0, 0]
@@ -450,13 +455,20 @@ class VirtualGrowthEngine:
         # If you want to produce figures or GIF, call plot functions
         if make_figure:
             # Example 2D call:
-            final_raster = plot_microstructure_2d(
-                m, full_mesh, self.all_elems, self.block_library, v_array, r_array, periodic, color=color, save_path=save_path, fig_name=fig_name)
+            if self.dim == 2:
+                final_raster = plot_microstructure_2d(
+                    m, full_mesh, self.all_elems, self.block_library, v_array, r_array, periodic, color=color, save_path=save_path, fig_name=fig_name)
+            else:  # 3D
+                final_voxel = plot_microstructure_3d(
+                    m, full_mesh, self.all_elems, self.block_library, v_array, r_array, periodic, save_path=save_path, fig_name=fig_name)
         if save_mesh:
-            np.save(save_mesh_path + save_mesh_name, final_raster)
+            if self.dim == 2:
+                np.save(save_mesh_path + save_mesh_name, final_raster)
+            else:  # 3D
+                np.save(save_mesh_path + save_mesh_name, final_voxel)
 
-        if make_gif:
-            plot_microstructure_gif()  # 需要修改！！！！！
+        # if make_gif:
+        #     plot_microstructure_gif()  # 需要修改！！！！！
 
     def _prepare_dimensions(self, mesh_size, elem_size, void):
         """
