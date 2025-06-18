@@ -27,64 +27,72 @@ from utils.linear_and_heaviside_filter import linear_filter, heaviside
 from matplotlib.colors import ListedColormap
 from skimage.morphology import remove_small_holes
 import os
-from typing import Tuple
-
-from utils.remove_repeated_nodes import remove_repeated_nodes
+from typing import Tuple, Sequence
 
 
 def plot_voxel_structure_binary(
-        vol: np.ndarray,                # 0/1 体素数组，shape=(Z,Y,X)
+        vol: np.ndarray,                # shape (Z,Y,X)，0=void，其余=block label
         pitch: float,
         bb_min: Tuple[float, float, float] = (0., 0., 0.),
-        color: str = "skyblue",
-        opacity_value: float = 1.0,
-        save_path: str = "",            # 保存目录；"" → 交互显示
-        fig_name: str = "voxel_binary.png",
-        show_grid: bool = False,
-        window_size=(1600, 1600)
+        base_cmap: str = "Set2",        # 调色板基名
+        opacity_value: float = 1.0,     # 非零体素的不透明度
+        save_path: str = "",            # "" → 交互显示；否则离屏保存
+        fig_name: str = "voxel_labeled.png",
+        show_grid: bool = True,
+        window_size: Sequence[int] = (1600, 1600)
 ):
-    """Render a binary voxel structure (labels 0/1) with PyVista."""
+    """Render a multi-label voxel structure with deterministic Set2 colors."""
     Nz, Ny, Nx = vol.shape
+    labels = np.unique(vol)
+    max_label = int(labels.max())
+    if max_label == 0:
+        raise ValueError("Volume only contains label 0 (void). Nothing to plot.")
 
-    # 1) VTK ImageData
     grid = pv.ImageData(
         dimensions=(Nx + 1, Ny + 1, Nz + 1),
         spacing=(pitch, pitch, pitch),
         origin=bb_min,
     )
-    # grid.cell_data["rho"] = vol.ravel(order="F")      # 只含 0/1
-    grid.cell_data["rho"] = vol.transpose(2, 1, 0).ravel(order="F").astype(np.float32)
+    grid.cell_data["labels"] = vol.transpose(2, 1, 0).ravel(order="F").astype(np.int32)
+    grid.set_active_scalars("labels")
 
+    palette = plt.cm.get_cmap(base_cmap, max_label)
+    colors_rgba = [(1, 1, 1, 1)]
+    for i in range(max_label):
+        c = palette(i)
+        colors_rgba.append(c)
 
-    # 2) Plotter
+    cmap = ListedColormap(colors_rgba)
+    opacity = [0.0] + [opacity_value] * max_label   # index 0 透明
+
+    # ---------- 3. PyVista Plotter ----------
     off = bool(save_path)
     if off:
         pv.global_theme.off_screen = True
     p = pv.Plotter(off_screen=off, window_size=window_size)
 
-    # 3) 体素渲染：同你单块函数的参数
     p.add_volume(
         grid,
-        scalars="rho",
-        opacity=[0.0, opacity_value],   # 0 → 透明，1 → 不透明
-        cmap=[color, color],            # 两个颜色值即可
-        shade=False,
+        scalars="labels",
+        cmap=cmap,
+        opacity=opacity,
+        shade=True,
         preference="cell",
     )
 
     if show_grid:
         p.show_grid(color="lightgray")
-    # p.view_isometric()
-    # p.reset_camera()                   # 保证相机在外
 
-    # 4) 显示 / 保存
+    p.reset_camera()
+    p.view_isometric()
+
     if off:
         os.makedirs(save_path, exist_ok=True)
-        p.show(auto_close=False)       # 触发离屏渲染
+        p.show(auto_close=False)
         p.screenshot(os.path.join(save_path, fig_name))
-        print("[INFO] saved:", os.path.join(save_path, fig_name))
+        print(f"[INFO] Saved to {os.path.join(save_path, fig_name)}")
     else:
-        p.show(title="Voxel structure")
+        p.show(title="Voxel structure (labeled)")
 
     p.close()
 
@@ -256,6 +264,7 @@ ZMIN, ZMAX, YMIN, YMAX, XMIN, XMAX = range(6)
 def plot_microstructure_3d(
     m,
     full_mesh,                  # (Nz, Ny, Nx) of "parent suffix"
+    uid2oid,
     all_elems,                  # len = Nz*Ny*Nx
     block_library,
     v_array,                    # (Ne,2)
@@ -272,6 +281,7 @@ def plot_microstructure_3d(
     -------
     volume : np.ndarray(uint8)  shape (Ztot, Ytot, Xtot)  – 0=void, 1..n=labels
     """
+    # print(full_mesh)
     Nz, Ny, Nx = full_mesh.shape
 
     parent_set = sorted({cell.split(" ")[0] for cell in full_mesh.ravel()
@@ -295,13 +305,15 @@ def plot_microstructure_3d(
                     continue
                 suffix_str = block[block.index(" ") + 1:]
                 rotation = int(suffix_str)
+                rotation_oid = uid2oid[parent][rotation]
+                # print(rotation, rotation_oid)
                 eid = all_elems[k]
                 v_rng = v_array[eid]
                 rand_r = r_array[eid]
                 blk = block_library.create_block(parent, m, v_rng,
-                                                 rotation, rand_r)
+                                                 rotation_oid, rand_r)
                 thickness_arr[z, y, x] = blk.get_thickness()
-                block_meta.append((z, y, x, parent, rotation, v_rng, rand_r))
+                block_meta.append((z, y, x, parent, rotation_oid, v_rng, rand_r))
                 k += 1
 
     def _avg(a, b):
@@ -353,9 +365,8 @@ def plot_microstructure_3d(
         vol,               # 0/1 ndarray
         pitch=0.04,
         bb_min=(-1, -1, -1),
-        color="black",
         opacity_value=1.0,
-        save_path=save_path,      # "" → 交互
+        save_path=save_path,
         fig_name=fig_name,
     )
 

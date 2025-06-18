@@ -1,5 +1,6 @@
 import numpy as np
 from itertools import permutations, product
+from typing import List, Tuple
 
 
 def rotate_thickness_matrix(old_mat: np.ndarray, rotation: int) -> np.ndarray:
@@ -73,94 +74,100 @@ def rotation_sequence(rotation):
 
 #  idx 0→Z-  1→Z+  2→Y-  3→Y+  4→X-  5→X+
 
+# ---------- 6 faces order ： Z- Z+ Y- Y+ X- X+ ----------
 FACES_3D = np.array([
-    [0,  0, -1],   # Z-  (bottom)
+    [0,  0, -1],   # Z-
     [0,  0,  1],   # Z+
-    [0, -1,  0],   # Y-  (back)
+    [0, -1,  0],   # Y-
     [0,  1,  0],   # Y+
-    [-1,  0,  0],   # X-  (left)
+    [-1, 0,  0],   # X-
     [1,  0,  0],   # X+
 ], dtype=int)
 
+# ──────────────────────────────────────────────────────────
+# elementary 90-deg rotation matrices (右手系，+k 表示 CCW looking to +axis)
+# ──────────────────────────────────────────────────────────
+def R_x(k:int): return np.linalg.matrix_power(
+    np.array([[1,0,0],[0,0,-1],[0,1,0]], int), k % 4)
 
-def _generate_rot_mats():
-    """Enumerate all 24 proper rotations of the cube."""
-    mats = []
-    for perm in permutations([0, 1, 2]):            # axis permutation
-        P = np.eye(3, dtype=int)[:, perm]           # permutation matrix
-        for signs in product([-1, 1], repeat=3):    # sign flips
-            S = np.diag(signs)
-            R = P @ S                               # candidate
-            if np.linalg.det(R) == 1:               # proper (right-handed)
-                mats.append(R.astype(int))
-    # sanity check
-    mats_unique = np.unique(np.stack(mats), axis=0)
-    assert mats_unique.shape[0] == 24, "Should have 24 unique rotations"
-    return list(mats_unique)
+def R_y(k:int): return np.linalg.matrix_power(
+    np.array([[0,0,1],[0,1,0],[-1,0,0]], int), k % 4)
 
+def R_z(k:int): return np.linalg.matrix_power(
+    np.array([[0,-1,0],[1,0,0],[0,0,1]], int), k % 4)
 
-ROT_MATS = _generate_rot_mats()
+# ──────────────────────────────────────────────────────────
+# build 24 orientations **exactly** in the same order
+# as _rotate_block_:
+#   group-A :  front stays front   →  Rz(0..3)
+#   group-B :  front→top           →  Rx(-1)  then Rz(0..3)
+#   group-C :  front→bottom        →  Rx(+1)  then Rz(0..3)
+#   group-D :  front→left          →  Ry(+1)  then Rz(0..3)
+#   group-E :  front→right         →  Ry(-1)  then Rz(0..3)
+#   group-F :  front→back          →  Rx(+2)  then Rz(0..3)
+# ──────────────────────────────────────────────────────────
+ROT_MATS, PERMS, FLIPS = [], [], []
 
+def _append(R):
+    ROT_MATS.append(R)
+    # derive perm / flips for rotate_voxel_24
+    perm  = tuple(np.argmax(np.abs(R), axis=0))         # where old X,Y,Z go
+    flips = tuple(int(R[row, col]) for col, row in enumerate(perm))
+    PERMS.append(perm)
+    FLIPS.append(flips)
 
-def rotate_thickness_matrix_3d(old_faces: np.ndarray, orient_id: int) -> np.ndarray:
-    """
-    Parameters
-    ----------
-    old_faces : np.ndarray, shape (6,)
-        Thicknesses in order (Z- Z+ Y- Y+ X- X+).
-    orient_id : int 0-23
-        Index into ROT_MATS corresponding to block orientation.
+# group-A
+for k in range(4):
+    _append(R_z(k))
+# group-B  front→top  (Rx -90°)
+for k in range(4):
+    _append(R_z(k) @ R_x(-1))
+# group-C  front→bottom (Rx +90°)
+for k in range(4):
+    _append(R_z(k) @ R_x(1))
+# group-D  front→left (Ry +90°)
+for k in range(4):
+    _append(R_z(k) @ R_y(1))
+# group-E  front→right (Ry -90°)
+for k in range(4):
+    _append(R_z(k) @ R_y(-1))
+# group-F  front→back  (Rx 180°)
+for k in range(4):
+    _append(R_z(k) @ R_x(2))
 
-    Returns
-    -------
-    new_faces : np.ndarray, shape (6,)
-        Thicknesses arranged for the oriented block in *same* ordering
-        (Z- Z+ Y- Y+ X- X+).
-    """
-    if old_faces.shape != (6,):
-        raise ValueError("old_faces must be length-6 array")
-    R = ROT_MATS[orient_id]                           # (3,3)
-    new_faces = np.zeros(6, dtype=old_faces.dtype)
-    for new_idx, n_global in enumerate(FACES_3D):
-        # Which old face now aligns with this global normal?
-        n_old = R.T @ n_global                       # back-transform
-        # find exact match in reference normals
-        old_idx = np.where((FACES_3D == n_old).all(axis=1))[0][0]
-        new_faces[new_idx] = old_faces[old_idx]
-    return new_faces
+# sanity-check
+assert len(ROT_MATS) == 24, "must have 24 distinct right-hand rotations"
+assert len({R.tobytes() for R in ROT_MATS}) == 24, "no duplicates!"
 
-
-PERMS, FLIPS = [], []          # list[tuple(3)], list[tuple(3)]
-for perm in permutations([0, 1, 2]):
-    for flips in product([1, -1], repeat=3):
-        P = np.eye(3, dtype=int)[:, perm]
-        M = P * flips
-        if round(np.linalg.det(M)) == 1:   # proper rotation
-            PERMS.append(perm)
-            FLIPS.append(flips)
-
-assert len(PERMS) == 24    # 共 24 种
+# ROT_TO_ID = {R.tobytes(): i for i, R in enumerate(ROT_MATS)}
 
 
-def rotate_voxel_24(block: np.ndarray, orient_id: int) -> np.ndarray:
-    """
-    Rotate voxel block into one of 24 right-handed orientations.
+def rotate_thickness_matrix_3d(faces6: np.ndarray, oid: int) -> np.ndarray:
+    """faces6: [Z-,Z+,Y-,Y+,X-,X+]"""
+    R = ROT_MATS[oid]
+    out = np.empty_like(faces6)
+    # print(oid)
+    for i_glb, n_glb in enumerate(FACES_3D):
+        n_loc = R.T @ n_glb
+        i_old = np.where((FACES_3D == n_loc).all(1))[0][0]
+        out[i_glb] = faces6[i_old]
+    return out
 
-    Parameters
-    ----------
-    block      : ndarray (Z, Y, X)
-    orient_id  : int 0-23  (same index for thickness rotation)
 
-    Returns
-    -------
-    ndarray rotated to the requested orientation
-    """
-    perm = PERMS[orient_id]
-    flips = FLIPS[orient_id]
-
-    rot = np.transpose(block, axes=perm)
-
-    for ax, sgn in enumerate(flips):
-        if sgn == -1:
+def rotate_voxel_24(arr: np.ndarray, oid: int) -> np.ndarray:
+    perm, flips = PERMS[oid], FLIPS[oid]
+    rot = np.transpose(arr, axes=perm)
+    for ax, s in enumerate(flips):
+        if s == -1:
             rot = np.flip(rot, axis=ax)
     return rot
+
+
+def inv_id(oid: int) -> int:
+    """Return orientation-ID whose matrix equals ROT_MATS[oid].T"""
+    R_inv = ROT_MATS[oid].T
+    for j, R in enumerate(ROT_MATS):
+        if (R == R_inv).all():
+            return j
+  
+    raise ValueError("inverse orientation not found (rotation table incomplete)")

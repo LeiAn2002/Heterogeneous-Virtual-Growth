@@ -25,12 +25,12 @@ from mpi4py import MPI
 from pathlib import Path
 import time
 
-mesh_number = 3
-element_number = 1
+mesh_number = 1
+element_number = 2
 mesh_size = (mesh_number, mesh_number, mesh_number)
 # mesh_size = (1, 1)
 element_size = (element_number, element_number, element_number)
-candidates = ["cross_3d"]
+candidates = ["t_3d", "cross_3d"]
 # candidates = ["arrow"]
 num_elems = np.prod(mesh_size)
 frequency_hints = np.random.rand(num_elems, len(candidates))
@@ -55,8 +55,8 @@ frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 
 # r_array = np.tile(first_row_r, (mesh_number, 1))
 # r_array = r_array.flatten()
 
-lower_boundary_v = 0.1
-upper_boundary_v = 0.8
+lower_boundary_v = 0.3
+upper_boundary_v = 0.3
 v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number * mesh_number, 2))
 
 # v_array = np.array([[0.8, 0.8], [0.2, 0.2], [0.2, 0.2], [0.2, 0.2], [0.2, 0.2],[0.2, 0.2],
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     start_time = time.time()
     main(mesh_size, element_size, candidates, frequency_hints, v_array, r_array, m, void,
          periodic=True, num_tries=40, print_frequency=False, make_figure=True,
-         make_gif=False, color="#96ADFC", save_path=save_path, fig_name=fig_name,
+         make_gif=False, color="#96ADFC", save_path=None, fig_name=fig_name,
          gif_name=gif_name,
          save_mesh=True, save_mesh_path=save_path,
          save_mesh_name="symbolic_graph.npy")
