@@ -378,7 +378,7 @@ def plot_microstructure_3d(
         vol,               # 0/1 ndarray
         pitch=0.04,
         bb_min=(-1, -1, -1),
-        opacity_value=1.0,
+        opacity_value=0.5,
         save_path=save_path,
         fig_name=fig_name,
     )
