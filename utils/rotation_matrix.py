@@ -84,17 +84,21 @@ FACES_3D = np.array([
     [1,  0,  0],   # X+
 ], dtype=int)
 
+
 # ──────────────────────────────────────────────────────────
 # elementary 90-deg rotation matrices (右手系，+k 表示 CCW looking to +axis)
 # ──────────────────────────────────────────────────────────
 def R_x(k:int): return np.linalg.matrix_power(
     np.array([[1,0,0],[0,0,-1],[0,1,0]], int), k % 4)
 
+
 def R_y(k:int): return np.linalg.matrix_power(
     np.array([[0,0,1],[0,1,0],[-1,0,0]], int), k % 4)
 
+
 def R_z(k:int): return np.linalg.matrix_power(
     np.array([[0,-1,0],[1,0,0],[0,0,1]], int), k % 4)
+
 
 # ──────────────────────────────────────────────────────────
 # build 24 orientations **exactly** in the same order
@@ -108,6 +112,7 @@ def R_z(k:int): return np.linalg.matrix_power(
 # ──────────────────────────────────────────────────────────
 ROT_MATS, PERMS, FLIPS = [], [], []
 
+
 def _append(R):
     ROT_MATS.append(R)
     # derive perm / flips for rotate_voxel_24
@@ -115,6 +120,7 @@ def _append(R):
     flips = tuple(int(R[row, col]) for col, row in enumerate(perm))
     PERMS.append(perm)
     FLIPS.append(flips)
+
 
 # group-A
 for k in range(4):
@@ -140,6 +146,16 @@ assert len(ROT_MATS) == 24, "must have 24 distinct right-hand rotations"
 assert len({R.tobytes() for R in ROT_MATS}) == 24, "no duplicates!"
 
 # ROT_TO_ID = {R.tobytes(): i for i, R in enumerate(ROT_MATS)}
+
+new2old = [
+     0, 12, 22, 16,  4,  7,  6,  5,
+     20, 18,  2, 14,  8,  9, 10, 11,
+     3, 15, 21, 19,  1, 13, 23, 17
+]
+
+ROT_MATS = [ROT_MATS[i] for i in new2old]
+PERMS = [PERMS[i] for i in new2old]
+FLIPS = [FLIPS[i] for i in new2old]
 
 
 def rotate_thickness_matrix_3d(faces6: np.ndarray, oid: int) -> np.ndarray:

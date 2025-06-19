@@ -77,43 +77,40 @@ class PairRules3D:
     # ---------- helpers -----------------------------------------------------
 
     @staticmethod
-    def _rotate_block(mat):
+    def _rotate_block(inp_block):
         """
-        Enumerate all 24 orientation variants in 3-D:
-
-        * Keep the original “front” face, rotate around Z axis 0-3 times.
-        * Rotate the original block so that the old front faces become
-          top / bottom / left / right / back, then for each of those
-          orientations rotate around the new Z (old axes) 0-3 times.
-
-        Returns an array with shape (24, Z, Y, X).
+        Rotate the block to find the variations.
+        x ← ⵙ z
+            ↓
+            y
+        There are 6 possibilities for the surface towards the y-direction. We
+        rotate the input block in the x-y plane for 4 times. We rotate the same
+        input block in the y-z plane for 2 times.
+        Then there are 4 possibilities for the surface towards the z-direction for
+        each surface towards the y-direction (reference block). We rotate the
+        reference block in the x-z plane for four 4 times.
         """
-        mats = []
-        # front remains front (Y axis still points forward)
-        for i in range(4):
-            mats.append(np.rot90(mat, i, axes=(1, 2)))
-        # front -> top
-        top = np.rot90(mat, -1, axes=(0, 1))
-        for i in range(4):
-            mats.append(np.rot90(top, i, axes=(0, 2)))
-        # front -> bottom
-        bottom = np.rot90(mat, 1, axes=(0, 1))
-        for i in range(4):
-            mats.append(np.rot90(bottom, i, axes=(0, 2)))
-        # front -> left
-        left = np.rot90(mat, 1, axes=(0, 2))
-        for i in range(4):
-            mats.append(np.rot90(left, i, axes=(0, 1)))
-        # front -> right
-        right = np.rot90(mat, -1, axes=(0, 2))
-        for i in range(4):
-            mats.append(np.rot90(right, i, axes=(0, 1)))
-        # front -> back
-        back = np.rot90(mat, 2, axes=(0, 1))
-        for i in range(4):
-            mats.append(np.rot90(back, i, axes=(1, 2)))
+        out_blocks = np.zeros((24, *inp_block.shape))
+        k = 0
 
-        return np.array(mats, dtype=int)
+        for i in range(4):  # Rotation in the x-y plane
+            ref_block = np.rot90(inp_block, i, axes=(1, 2))
+
+            for j in range(4):  # Further rotation in the x-z plane
+                out_blocks[k] = np.rot90(ref_block, j, axes=(0, 2))
+                k += 1
+
+        ref_block = np.rot90(inp_block, 1, axes=(0, 1))
+        for j in range(4):  # Further rotation in the x-z plane
+            out_blocks[k] = np.rot90(ref_block, j, axes=(0, 2))
+            k += 1
+
+        ref_block = np.rot90(inp_block, -1, axes=(0, 1))
+        for j in range(4):  # Further rotation in the x-z plane
+            out_blocks[k] = np.rot90(ref_block, j, axes=(0, 2))
+            k += 1
+
+        return out_blocks.astype(int)
 
     @staticmethod
     def _remove_repeated_blocks(blocks):
