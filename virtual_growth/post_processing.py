@@ -282,6 +282,7 @@ def plot_microstructure_3d(
     volume : np.ndarray(uint8)  shape (Ztot, Ytot, Xtot)  – 0=void, 1..n=labels
     """
     # print(full_mesh)
+    # print(uid2oid)
     Nz, Ny, Nx = full_mesh.shape
 
     parent_set = sorted({cell.split(" ")[0] for cell in full_mesh.ravel()

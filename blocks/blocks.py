@@ -1405,6 +1405,7 @@ class TBlock3D(Block):
         thickness_matrix = np.concatenate((first_part, second_part))  # Z- Z+ Y- Y+ X- X+
         # print(thickness_matrix)
         rotated_thickness_matrix = rotate_thickness_matrix_3d(thickness_matrix, self.rotation)
+        # print(rotated_thickness_matrix)
         # print(self.rotation)
         return rotated_thickness_matrix
 
