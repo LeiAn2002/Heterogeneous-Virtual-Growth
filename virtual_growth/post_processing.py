@@ -108,6 +108,7 @@ def plot_voxel_structure_binary(
 
     p.close()
 
+
 def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
     """This function is used to compute frequency distribution of designs."""
     reduced_list = aug_candidates.copy()
