@@ -86,30 +86,20 @@ FACES_3D = np.array([
 
 
 # ──────────────────────────────────────────────────────────
-# elementary 90-deg rotation matrices (右手系，+k 表示 CCW looking to +axis)
+# elementary 90-deg rotation matrices
 # ──────────────────────────────────────────────────────────
-def R_x(k:int): return np.linalg.matrix_power(
-    np.array([[1,0,0],[0,0,-1],[0,1,0]], int), k % 4)
+def R_x(k: int): return np.linalg.matrix_power(
+    np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], int), k % 4)
 
 
-def R_y(k:int): return np.linalg.matrix_power(
-    np.array([[0,0,1],[0,1,0],[-1,0,0]], int), k % 4)
+def R_y(k: int): return np.linalg.matrix_power(
+    np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]], int), k % 4)
 
 
-def R_z(k:int): return np.linalg.matrix_power(
-    np.array([[0,-1,0],[1,0,0],[0,0,1]], int), k % 4)
+def R_z(k: int): return np.linalg.matrix_power(
+    np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]], int), k % 4)
 
 
-# ──────────────────────────────────────────────────────────
-# build 24 orientations **exactly** in the same order
-# as _rotate_block_:
-#   group-A :  front stays front   →  Rz(0..3)
-#   group-B :  front→top           →  Rx(-1)  then Rz(0..3)
-#   group-C :  front→bottom        →  Rx(+1)  then Rz(0..3)
-#   group-D :  front→left          →  Ry(+1)  then Rz(0..3)
-#   group-E :  front→right         →  Ry(-1)  then Rz(0..3)
-#   group-F :  front→back          →  Rx(+2)  then Rz(0..3)
-# ──────────────────────────────────────────────────────────
 ROT_MATS, PERMS, FLIPS = [], [], []
 
 
@@ -160,14 +150,15 @@ FLIPS = [FLIPS[i] for i in new2old]
 
 def rotate_thickness_matrix_3d(faces6: np.ndarray, oid: int) -> np.ndarray:
     """faces6: [Z-,Z+,Y-,Y+,X-,X+]"""
-    R = ROT_MATS[oid]
-    out = np.empty_like(faces6)
-    # print(oid)
-    for i_glb, n_glb in enumerate(FACES_3D):
-        n_loc = R.T @ n_glb
-        i_old = np.where((FACES_3D == n_loc).all(1))[0][0]
-        out[i_glb] = faces6[i_old]
-    return out
+    thick = faces6.reshape(3, 2)
+    perm, flips = PERMS[oid], FLIPS[oid]
+    thick = thick[list(perm), :]
+
+    for axis, f in enumerate(flips):
+        if f == -1:
+            thick[axis] = thick[axis, ::-1]
+
+    return thick.ravel()
 
 
 def rotate_voxel_24(arr: np.ndarray, oid: int) -> np.ndarray:

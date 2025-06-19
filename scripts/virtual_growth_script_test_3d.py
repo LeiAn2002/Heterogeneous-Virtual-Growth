@@ -25,12 +25,12 @@ from mpi4py import MPI
 from pathlib import Path
 import time
 
-mesh_number = 2
+mesh_number = 4
 element_number = 1
 mesh_size = (mesh_number, mesh_number, mesh_number)
 # mesh_size = (1, 1)
 element_size = (element_number, element_number, element_number)
-candidates = ["cross_3d"]
+candidates = ["t_3d"]
 # candidates = ["arrow"]
 num_elems = np.prod(mesh_size)
 frequency_hints = np.random.rand(num_elems, len(candidates))
