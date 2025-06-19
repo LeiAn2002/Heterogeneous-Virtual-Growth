@@ -80,7 +80,7 @@ if __name__ == "__main__":
     start_time = time.time()
     main(mesh_size, element_size, candidates, frequency_hints, v_array, r_array, m, void,
          periodic=True, num_tries=40, print_frequency=False, make_figure=True,
-         make_gif=False, color="#96ADFC", save_path=None, fig_name=fig_name,
+         make_gif=False, color="#96ADFC", save_path=save_path, fig_name=fig_name,
          gif_name=gif_name,
          save_mesh=True, save_mesh_path=save_path,
          save_mesh_name="symbolic_graph.npy")

@@ -38,24 +38,27 @@ def plot_voxel_structure_binary(
         opacity_value: float = 1.0,     # 非零体素的不透明度
         save_path: str = "",            # "" → 交互显示；否则离屏保存
         fig_name: str = "voxel_labeled.png",
-        show_grid: bool = True,
+        show_grid: bool = False,
         window_size: Sequence[int] = (1600, 1600)
 ):
-    """Render a multi-label voxel structure with deterministic Set2 colors."""
+    """Extract surfaces for each material label and render as meshes."""
     Nz, Ny, Nx = vol.shape
     labels = np.unique(vol)
     max_label = int(labels.max())
     if max_label == 0:
         raise ValueError("Volume only contains label 0 (void). Nothing to plot.")
 
+    # Build a uniform ImageData grid matching the voxel layout
     grid = pv.ImageData(
         dimensions=(Nx + 1, Ny + 1, Nz + 1),
         spacing=(pitch, pitch, pitch),
         origin=bb_min,
     )
+    # assign cell scalars from the volume array
     grid.cell_data["labels"] = vol.transpose(2, 1, 0).ravel(order="F").astype(np.int32)
     grid.set_active_scalars("labels")
 
+    # Prepare a discrete colormap: white for 0, then Set2 colors for 1..max_label
     palette = plt.cm.get_cmap(base_cmap, max_label)
     colors_rgba = [(1, 1, 1, 1)]
     for i in range(max_label):
@@ -63,22 +66,29 @@ def plot_voxel_structure_binary(
         colors_rgba.append(c)
 
     cmap = ListedColormap(colors_rgba)
-    opacity = [0.0] + [opacity_value] * max_label   # index 0 透明
 
-    # ---------- 3. PyVista Plotter ----------
-    off = bool(save_path)
-    if off:
+    # Setup plotter
+    offscreen = bool(save_path)
+    if offscreen:
         pv.global_theme.off_screen = True
-    p = pv.Plotter(off_screen=off, window_size=window_size)
+    p = pv.Plotter(off_screen=offscreen, window_size=window_size)
 
-    p.add_volume(
-        grid,
-        scalars="labels",
-        cmap=cmap,
-        opacity=opacity,
-        shade=True,
-        preference="cell",
-    )
+    # For each material label > 0, extract its surface and add as a mesh
+    for label in range(1, max_label + 1):
+        # threshold to isolate this label
+        sel = grid.threshold([label, label], scalars="labels")
+        # convert to surface mesh
+        surf = sel.extract_surface()
+        # choose color from our ListedColormap
+        rgba = cmap(label)
+        # add the surface mesh to the plotter
+        p.add_mesh(
+            surf,
+            color=rgba[:3],           # RGB tuple
+            opacity=opacity_value,     # set opacity for the mesh
+            show_edges=False,          # edges off for cleaner look
+            smooth_shading=True        # enable smooth lighting
+        )
 
     if show_grid:
         p.show_grid(color="lightgray")
@@ -86,16 +96,17 @@ def plot_voxel_structure_binary(
     p.reset_camera()
     p.view_isometric()
 
-    if off:
+    # render or save
+    if offscreen:
         os.makedirs(save_path, exist_ok=True)
         p.show(auto_close=False)
-        p.screenshot(os.path.join(save_path, fig_name))
-        print(f"[INFO] Saved to {os.path.join(save_path, fig_name)}")
+        out_file = os.path.join(save_path, fig_name)
+        p.screenshot(out_file)
+        print(f"[INFO] Saved to {out_file}")
     else:
-        p.show(title="Voxel structure (labeled)")
+        p.show(title="Voxel structure (surface)")
 
     p.close()
-
 
 def compute_final_frequency(block_count, num_elem, aug_candidates, candidates):
     """This function is used to compute frequency distribution of designs."""
