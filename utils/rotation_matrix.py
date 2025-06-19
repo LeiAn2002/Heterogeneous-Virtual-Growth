@@ -116,7 +116,7 @@ ROT_MATS, PERMS, FLIPS = [], [], []
 def _append(R):
     ROT_MATS.append(R)
     # derive perm / flips for rotate_voxel_24
-    perm  = tuple(np.argmax(np.abs(R), axis=0))         # where old X,Y,Z go
+    perm = tuple(np.argmax(np.abs(R), axis=0))         # where old X,Y,Z go
     flips = tuple(int(R[row, col]) for col, row in enumerate(perm))
     PERMS.append(perm)
     FLIPS.append(flips)
