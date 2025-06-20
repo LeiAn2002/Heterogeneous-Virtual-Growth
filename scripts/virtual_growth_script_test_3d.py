@@ -25,12 +25,12 @@ from mpi4py import MPI
 from pathlib import Path
 import time
 
-mesh_number = 4
+mesh_number = 1
 element_number = 1
 mesh_size = (mesh_number, mesh_number, mesh_number)
 # mesh_size = (1, 1)
 element_size = (element_number, element_number, element_number)
-candidates = ["t_3d", "cross_3d"]
+candidates = ["t_3d"]
 # candidates = ["arrow"]
 num_elems = np.prod(mesh_size)
 frequency_hints = np.random.rand(num_elems, len(candidates))
@@ -55,15 +55,15 @@ frequency_hints = frequency_hints / np.sum(frequency_hints, axis=1).reshape(-1, 
 # r_array = np.tile(first_row_r, (mesh_number, 1))
 # r_array = r_array.flatten()
 
-lower_boundary_v = 0.2
-upper_boundary_v = 0.6
+lower_boundary_v = 0.3
+upper_boundary_v = 0.3
 v_array = np.random.uniform(low=lower_boundary_v, high=upper_boundary_v, size=(mesh_number * mesh_number * mesh_number, 2))
 
 # v_array = np.array([[0.8, 0.8], [0.2, 0.2], [0.2, 0.2], [0.2, 0.2], [0.2, 0.2],[0.2, 0.2],
 #                     [0.2, 0.2], [0.2, 0.2]])
 
-lower_boundary_r = 0
-upper_boundary_r = 0
+lower_boundary_r = 0.5
+upper_boundary_r = 0.5
 r_array = np.random.uniform(low=lower_boundary_r, high=upper_boundary_r, size=(mesh_number * mesh_number * mesh_number, ))
 
 # d, m, n = 0.5, 0.75, 0.25
