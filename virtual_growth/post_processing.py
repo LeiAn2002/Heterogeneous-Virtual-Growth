@@ -31,12 +31,12 @@ from typing import Tuple, Sequence
 
 
 def plot_voxel_structure_binary(
-        vol: np.ndarray,                # shape (Z,Y,X)，0=void，其余=block label
+        vol: np.ndarray,
         pitch: float,
         bb_min: Tuple[float, float, float] = (0., 0., 0.),
-        base_cmap: str = "Set2",        # 调色板基名
-        opacity_value: float = 1.0,     # 非零体素的不透明度
-        save_path: str = "",            # "" → 交互显示；否则离屏保存
+        base_cmap: str = "Set2",
+        opacity_value: float = 1.0,
+        save_path: str = "",
         fig_name: str = "voxel_labeled.png",
         show_grid: bool = False,
         window_size: Sequence[int] = (1600, 1600)
@@ -59,12 +59,17 @@ def plot_voxel_structure_binary(
     grid.set_active_scalars("labels")
 
     # Prepare a discrete colormap: white for 0, then Set2 colors for 1..max_label
-    palette = plt.cm.get_cmap(base_cmap, max_label)
-    colors_rgba = [(1, 1, 1, 1)]
-    for i in range(max_label):
-        c = palette(i)
-        colors_rgba.append(c)
+    # palette = plt.cm.get_cmap(base_cmap, max_label)
+    # colors_rgba = [(1, 1, 1, 1)]
+    # for i in range(max_label):
+    #     c = palette(i)
+    #     colors_rgba.append(c)
 
+    # cmap = ListedColormap(colors_rgba)
+
+    orig_cmap = plt.cm.get_cmap(base_cmap)
+    colors = orig_cmap.colors[:max_label]  # first N colors
+    colors_rgba = [(1, 1, 1, 1)] + [tuple(c) for c in colors]
     cmap = ListedColormap(colors_rgba)
 
     # Setup plotter
@@ -105,6 +110,106 @@ def plot_voxel_structure_binary(
         print(f"[INFO] Saved to {out_file}")
     else:
         p.show(title="Voxel structure (surface)")
+
+    p.close()
+
+
+def plot_voxel_structure_binary_separate(
+        vol: np.ndarray,                # shape (Z,Y,X)，0=void，其余=block label
+        pitch: float,
+        bb_min: Tuple[float, float, float] = (0., 0., 0.),
+        base_cmap: str = "Set2",
+        opacity_value: float = 1.0,
+        save_path: str = "",
+        fig_name: str = "voxel_labeled.png",
+        show_grid: bool = False,
+        window_size: Sequence[int] = (1600, 800),
+        separate: bool = True
+):
+    """Render each material separately in subplots or in one scene."""
+    Nz, Ny, Nx = vol.shape
+    labels = np.unique(vol)
+    max_label = int(labels.max())
+    if max_label == 0:
+        raise ValueError("Volume only contains label 0 (void). Nothing to plot.")
+
+    # Build the structured grid
+    grid = pv.ImageData(
+        dimensions=(Nx + 1, Ny + 1, Nz + 1),
+        spacing=(pitch, pitch, pitch),
+        origin=bb_min,
+    )
+    grid.cell_data["labels"] = vol.transpose(2, 1, 0).ravel(order="F").astype(np.int32)
+    grid.set_active_scalars("labels")
+
+    # Prepare discrete colormap: white for 0, then Set2 for labels 1..N
+    orig_cmap = plt.cm.get_cmap(base_cmap)
+    colors = orig_cmap.colors[:max_label]
+    colors_rgba = [(1,1,1,1)] + [tuple(c) for c in colors]
+    cmap = ListedColormap(colors_rgba)
+
+    offscreen = bool(save_path)
+    if offscreen:
+        pv.global_theme.off_screen = True
+
+    if separate:
+        # Option A: create two subplots side by side
+        p = pv.Plotter(shape=(1,2), window_size=window_size, off_screen=offscreen)
+
+        for i, lbl in enumerate(range(1, max_label+1)):
+            # switch to subplot i
+            p.subplot(0, i)
+            # isolate one material
+            sel = grid.threshold([lbl, lbl], scalars="labels")
+            surf = sel.extract_surface()
+            rgba = cmap(lbl)
+
+            # add mesh for this material only
+            p.add_mesh(
+                surf,
+                color=rgba[:3],          # RGB
+                opacity=opacity_value,   # use given opacity
+                smooth_shading=True      # smooth lighting
+            )
+            # optional: add title text
+            # p.add_text(f"Material {lbl}", font_size=14)
+
+            if show_grid:
+                p.show_grid(color="lightgray")
+
+            p.view_isometric()
+
+        # link the two cameras so rotating one rotates the other
+        p.link_views()
+    else:
+        # Option B: single viewport, but translate material 2
+        p = pv.Plotter(window_size=(800,800), off_screen=offscreen)
+        for lbl in range(1, max_label+1):
+            sel = grid.threshold([lbl, lbl], scalars="labels")
+            surf = sel.extract_surface()
+            # translate label 2 by +Nx*pitch*1.2 in X direction
+            if lbl == 2:
+                surf = surf.translate((Nx*pitch*1.2, 0, 0), inplace=False)
+            rgba = cmap(lbl)
+            p.add_mesh(
+                surf,
+                color=rgba[:3],
+                opacity=opacity_value,
+                smooth_shading=True
+            )
+        if show_grid:
+            p.show_grid(color="lightgray")
+        p.view_isometric()
+
+    # render or save
+    if offscreen:
+        os.makedirs(save_path, exist_ok=True)
+        p.show(auto_close=False)
+        out = os.path.join(save_path, fig_name)
+        p.screenshot(out)
+        print(f"[INFO] Saved to {out}")
+    else:
+        p.show()
 
     p.close()
 
@@ -362,7 +467,7 @@ def plot_microstructure_3d(
         vox = blk.generate_block_shape(
             thickness_arr[z, y, x])
         lbl = parent2lbl[parent]
-        vox *= lbl
+        vox *= (lbl)
         z0, y0, x0 = z*bsize, y*bsize, x*bsize
         vol[z0:z0+bsize, y0:y0+by, x0:x0+bx] = np.maximum(
             vol[z0:z0+bsize, y0:y0+by, x0:x0+bx], vox)
@@ -378,9 +483,18 @@ def plot_microstructure_3d(
         vol,               # 0/1 ndarray
         pitch=0.04,
         bb_min=(-1, -1, -1),
-        opacity_value=0.5,
+        opacity_value=1,
         save_path=save_path,
         fig_name=fig_name,
+    )
+
+    plot_voxel_structure_binary_separate(
+        vol,               # 0/1 ndarray
+        pitch=0.04,
+        bb_min=(-1, -1, -1),
+        opacity_value=1,
+        save_path=save_path,
+        fig_name="_separate.png",
     )
 
     return vol
