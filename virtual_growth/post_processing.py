@@ -28,6 +28,21 @@ from matplotlib.colors import ListedColormap
 from skimage.morphology import remove_small_holes
 import os
 from typing import Tuple, Sequence
+import subprocess
+
+
+
+def save_to_ori(vol: np.ndarray, fname: str):
+    """
+    vol : (Nz, Ny, Nx) uint8  – 0 = void, 1..n = phase ids
+    fname : 'mystructure.ori'
+    """
+    Nz, Ny, Nx = vol.shape
+    # Neper x→1st index, y→2nd, z→3rd (same as our order)
+    header = f"* nregion {Nx} {Ny} {Nz}\n"
+    with open(fname, "wb") as f:
+        f.write(header.encode())
+        vol.tofile(f)       # binary dump, little-endian uint8
 
 
 def plot_voxel_structure_binary(
@@ -478,6 +493,66 @@ def plot_microstructure_3d(
     #     np.savetxt(os.path.join(save_path, "voxels.txt"), vol.reshape(-1), fmt="%d")
     # print(np.unique(vol))
     # np.savetxt("vol.txt", vol.flatten(), fmt='%.6f')
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        # get dimensions
+        Nz_tot, Ny_tot, Nx_tot = vol.shape
+
+        # 1) write TESR file for Neper
+        tesr_path = os.path.join(save_path, "microstructure.tesr")
+        tess_prefix = os.path.join(save_path, "microstructure-per")
+        hex_prefix  = os.path.join(save_path, "microstructure-hexmesh")
+        with open(tesr_path, "w") as f:
+            # Write TESR header
+            f.write("***tesr\n")
+            f.write("**format\n")
+            f.write("  2.1\n")
+            f.write("**general\n")
+            f.write("  3\n")
+            f.write(f"  {Nx_tot} {Ny_tot} {Nz_tot}\n")
+            f.write("  1.0 1.0 1.0\n")  # voxel size in x,y,z
+            f.write("**data\n")
+            f.write("  ascii\n")
+            f.write("  *data\n")
+            # Write the voxel labels: x-fastest, then y, then z
+            for k in range(Nz_tot):
+                for j in range(Ny_tot):
+                    row = " ".join(str(int(vol[k, j, i])) for i in range(Nx_tot))
+                    f.write(row + "\n")
+            f.write("***end\n")
+
+        # 2) run Neper: first build periodic tessellation, then mesh it
+        # 1) impose periodicity and export as scalar tessellation (.tess)
+        #    Note: do NOT include the .tess extension in the "-o" prefix
+        cmd1 = [
+            "neper", "-T",
+            "-n", "from_morpho",
+            "-morpho", f"tesr:file({tesr_path})",
+            "-domain", f"cube({Nx_tot},{Ny_tot},{Nz_tot})",
+            "-periodicity", "all",
+            "-reg", "0",
+            "-o", tess_prefix
+        ]
+        subprocess.run(cmd1, check=True)
+
+        # verify the .tess was created
+        tess_file = tess_prefix + ".tess"
+        if not os.path.isfile(tess_file):
+            raise FileNotFoundError(f"Expected tess file not found: {tess_file}")
+
+        # 2) generate a mapped hexahedral mesh on the scalar tessellation
+        cmd2 = [
+            "neper", "-M",
+            tess_file,                    # English comment: input the valid .tess file
+            "-elttype", "tet",            # English comment: mapped hexahedral elements
+            "-cl", "5",                   # English comment: target cell size
+            "-o", hex_prefix              # English comment: output prefix for .msh/.tess
+        ]
+        subprocess.run(cmd2, check=True)
+
+        print(f"Generated tessellation: {tess_file}")
+        print(f"Generated hexahedral mesh: {hex_prefix}.msh")
 
     plot_voxel_structure_binary(
         vol,               # 0/1 ndarray
