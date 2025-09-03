@@ -2,4 +2,4 @@
 DATE=$(date +%Y-%m-%d)
 git add .
 git commit -m "daily_update $DATE"
-git push -u origin HEAD:virtual_growth_for_cloak_clean
+git push origin virtual_growth_for_cloak_clean 
