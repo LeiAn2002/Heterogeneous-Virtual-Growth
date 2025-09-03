@@ -55,7 +55,7 @@ def main(
     engine = VirtualGrowthEngine(library)
 
     # 3) Generate pair rules
-    engine.generate_pair_rules(candidates)
+    engine.generate_pair_rules(candidates, mesh_size, elem_size, void)
 
     # 4) Run the virtual growth
     engine.run_growth(

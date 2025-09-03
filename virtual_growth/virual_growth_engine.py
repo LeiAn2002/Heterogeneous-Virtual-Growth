@@ -57,24 +57,34 @@ class VirtualGrowthEngine:
         self.z_cell = None
         self.all_elems = None
 
-    def generate_pair_rules(self, block_names):
+    def generate_pair_rules(self, block_names, mesh_size, elem_size, void):
         """
         Generate adjacency rules, rotation tables, etc., using PairRules2D.
         Stores the results as class attributes for subsequent use in run_growth.
         """
+        self._prepare_dimensions(mesh_size, elem_size, void)
         if self.dim == 2:
             pair_rule_gen = PairRules2D(self.block_library)
-        else:
+
+            (
+                self.all_unique_blocks,
+                self.all_extended_block_names,
+                self.encoded_rotation_table,
+                self.encoded_rules,
+                self.encoded_special_rules,
+            ) = pair_rule_gen.generate_rules(block_names)
+            
+        elif self.dim == 3:
             pair_rule_gen = PairRules3D(self.block_library)
 
-        (
-            self.all_unique_blocks,
-            self.all_extended_block_names,
-            self.encoded_rotation_table,
-            self.encoded_rules,
-            self.encoded_special_rules,
-            self.uid2oid
-        ) = pair_rule_gen.generate_rules(block_names)
+            (
+                self.all_unique_blocks,
+                self.all_extended_block_names,
+                self.encoded_rotation_table,
+                self.encoded_rules,
+                self.encoded_special_rules,
+                self.uid2oid
+            ) = pair_rule_gen.generate_rules(block_names)
 
         # Optionally decode or reorganize these if needed.
         # For example, if in your actual adjacency logic you rely on "names" being a numpy array:
@@ -82,7 +92,6 @@ class VirtualGrowthEngine:
         self.rules = self.encoded_rules
         self.rotation_table = self.encoded_rotation_table
         self.special_rules = self.encoded_special_rules
-        self.uid2oid = self.uid2oid
 
     def run_growth(
         self,
@@ -127,7 +136,7 @@ class VirtualGrowthEngine:
             raise ValueError("Dimensions of mesh and element are incompatible.")
 
         # Compute some parameters
-        self._prepare_dimensions(mesh_size, elem_size, void)
+        # self._prepare_dimensions(mesh_size, elem_size, void)
         void_elem_mask = np.isin(self.all_elems, void)
         self.void_cells_idx = np.where(void_elem_mask)[0]
         self.num_cells = self.num_cells - len(self.void_cells_idx)
